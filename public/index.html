@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Essensa — Generador de audios</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Generador de audios</h1>
+      <p class="sub">Elegí la modelo, escribí el mensaje y generá el audio.</p>
+    </header>
+
+    <main>
+      <label for="chatter">Tu nombre (chatter_id)</label>
+      <input id="chatter" type="number" placeholder="ID de chatter" />
+
+      <label for="model">Modelo</label>
+      <select id="model"></select>
+
+      <label for="phrase">Frase rápida (opcional)</label>
+      <select id="phrase">
+        <option value="">— Escribir manualmente —</option>
+      </select>
+
+      <label for="text">Texto</label>
+      <textarea id="text" rows="4" placeholder="Escribí el mensaje que va a decir el audio..."></textarea>
+
+      <button id="generate">Generar audio</button>
+
+      <div id="status" class="status"></div>
+
+      <audio id="player" controls style="display:none; width: 100%; margin-top: 16px;"></audio>
+      <a id="download" style="display:none;" download="audio.mp3">Descargar MP3</a>
+    </main>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

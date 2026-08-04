@@ -1,0 +1,18 @@
+{
+  "name": "essensa-voice-notes",
+  "version": "0.1.0",
+  "description": "Generador de audios con voz clonada para chatters de agencia OF",
+  "main": "src/server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  }
+}
