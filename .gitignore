@@ -3,6 +3,8 @@ data/
 .env
 *.log
 docs/branch-flow.md
+docs/audit-report.md
+docs/audit-report-full.md
 server/src/generated/
 server/dist/
 client/dist/

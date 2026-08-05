@@ -32,6 +32,15 @@ export async function generate(params: GenerateParams): Promise<GenerateResult> 
   const model = await prisma.model.findFirst({ where: { id: modelId, active: true } });
   if (!model) throw new TtsError(404, "Modelo no encontrado o inactivo");
 
+  if (chatter.role === "chatter") {
+    const access = await prisma.modelChatterAccess.findUnique({
+      where: { modelId_chatterId: { modelId, chatterId } },
+    });
+    if (!access) {
+      throw new TtsError(403, "No tenés acceso a esta modelo. Pedí la asignación a tu manager.");
+    }
+  }
+
   const consent = await prisma.modelConsent.findFirst({ where: { modelId }, orderBy: { consentedAt: "desc" } });
   if (!consent) {
     throw new TtsError(
@@ -74,9 +83,14 @@ export async function generate(params: GenerateParams): Promise<GenerateResult> 
     const buffer = await elevenlabs.generate({ voiceId: voice.elevenlabsVoiceId, text });
     const filePath = save(modelId, textHash, buffer);
 
-    await prisma.audioCache.create({ data: { modelId, textHash, text, filePath, charCount } });
+    const cache = await prisma.audioCache.upsert({
+      where: { modelId_textHash: { modelId, textHash } },
+      update: { hits: { increment: 1 } },
+      create: { modelId, textHash, text, filePath, charCount },
+    });
+
     await prisma.generation.create({
-      data: { chatterId, modelId, voiceId: voice.id, charCount, text, audioUrl: filePath, fromCache: false },
+      data: { chatterId, modelId, voiceId: voice.id, charCount, text, audioUrl: cache.filePath, fromCache: false },
     });
 
     return { buffer, fromCache: false };

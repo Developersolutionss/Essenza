@@ -22,7 +22,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   }
   const token = header.slice("Bearer ".length);
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET as string) as AuthPayload;
+    const payload = jwt.verify(token, process.env.JWT_SECRET as string, { algorithms: ["HS256"] }) as AuthPayload;
     req.user = payload;
     next();
   } catch {
