@@ -4,6 +4,10 @@ Este documento describe lo que está implementado hoy.
 El sistema actual es un MVP.
 Funciona en producción de prueba con datos de ejemplo.
 
+Nota: durante la migración, este MVP se porta a la nueva estructura.
+El porte mantiene la equivalencia funcional.
+El detalle de la migración está en [roadmap.md](roadmap.md).
+
 ## Tecnología actual
 
 - Node.js + Express (JavaScript, CommonJS).

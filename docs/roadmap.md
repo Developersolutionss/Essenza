@@ -14,9 +14,10 @@ La migración se hace por etapas.
 
 ## Estado objetivo
 
-- Node.js + Express en TypeScript.
-- PostgreSQL con Prisma.
-- Frontend en React (Vite + Tailwind).
+- Monorepo con npm workspaces: `server/` y `client/`.
+- Express 5 + TypeScript 5.9 en el server.
+- PostgreSQL con Prisma 7.
+- Frontend mínimo en React (Vite + Tailwind).
 - Autenticación JWT con roles.
 - Multi-tenant real por agencia.
 
@@ -24,24 +25,27 @@ La migración se hace por etapas.
 
 ### Etapa 1 — Datos
 
-- Migrar SQLite a PostgreSQL.
 - Definir el esquema con Prisma.
 - Crear las tablas `Agency` y `ModelChatterAccess`.
 - Separar `models.voice_id` en la entidad `Voice`.
-- Migrar los datos existentes.
+- Crear las tablas `AudioCache`, `Phrase` y `ModelConsent`.
+- Los datos actuales son de prueba. Se re-seed en limpio.
 
 ### Etapa 2 — Backend
 
 - Migrar el código a TypeScript.
+- Estructura de `routes/`, `services/` y `middleware/`.
+- Patrón de handler con zod.
 - Agregar la autenticación JWT.
 - Agregar los roles admin, manager y chatter.
 - Implementar el control de acceso por asignación.
+- Mantener la equivalencia funcional del MVP.
 
-### Etapa 3 — Frontend
+### Etapa 3 — Frontend mínimo
 
 - Migrar el frontend a React con Vite y Tailwind.
-- Mantener las mismas funciones del MVP.
-- Agregar el panel de administración.
+- Una página mínima para verificar la API.
+- Cuando el frontend sea prioridad, se amplía.
 
 ### Etapa 4 — Infraestructura
 

@@ -49,32 +49,66 @@ Es el punto correcto para agregar otros proveedores de voz.
 ## Arquitectura objetivo
 
 ```
-React (Vite + Tailwind)
-        │
-        │  API
-        │
-   Express + TypeScript
-        │
-   Prisma ──> PostgreSQL
-        │
-   storage (filesystem VPS o S3)
-        │
-   proveedor de voz (ElevenLabs)
+server/                         client/
+   ├── index.ts                   ├── React (Vite + Tailwind)
+   ├── middleware/auth.ts         └── página mínima (verifica la API)
+   ├── routes/*.ts
+   ├── services/*.ts
+   ├── providers/elevenlabs.ts
+   ├── prisma.ts ──> Prisma ──> PostgreSQL
+   └── audioStore.ts
+                    │
+                    │  ElevenLabs API
 ```
+
+## Estructura del server
+
+El server sigue la estructura por capas con routers por recurso.
+
+- `routes/` — un router por recurso (`auth`, `models`, `voices`, `generations`, `phrases`, `usage`).
+- `services/` — lógica que toca varias tablas.
+- `middleware/auth.ts` — autenticación y roles.
+- `providers/` — capa desacoplada de proveedor de voz.
+- `prisma.ts` — único `PrismaClient` con adapter Postgres.
+
+## Patrón de handler
+
+Cada endpoint sigue el mismo patrón.
+
+1. Definir un schema con zod en el archivo.
+2. Validar el cuerpo con `safeParse`.
+3. Si falla, devolver `400` con `{ error, details }`.
+4. Ejecutar la operación con Prisma.
+5. Devolver JSON plano con el código correcto.
+
+Las mutaciones que tocan varias tablas usan `prisma.$transaction(tx)`.
+
+## Respuestas y errores
+
+- Éxito: JSON plano del recurso.
+- Error: `{ "error": string }`.
+- Validación: `{ "error": string, "details": ... }`.
+- Códigos: `400` inválido, `401` sin token, `403` sin permisos, `404` no encontrado.
 
 ## Seguridad
 
 ### Autenticación
 
 El sistema usa JWT.
-Cada petición lleva un token.
-El token contiene el rol del usuario.
+Cada petición lleva un token Bearer.
+El middleware `requireAuth` verifica el token.
+El middleware inyecta el usuario en la petición.
 
 ### Roles
+
+El middleware `requireRole(...roles)` limita el acceso por rol.
 
 - **Admin**: acceso total.
 - **Manager**: acceso a sus agencias.
 - **Chatter**: acceso solo a las modelos asignadas.
+
+Los routers se protegen con `router.use(requireAuth)`.
+Las rutas públicas quedan fuera del middleware.
 
 ### Control de acceso
 
