@@ -1,87 +1,98 @@
 # Estado actual del sistema
 
 Este documento describe lo que está implementado hoy.
-El sistema actual es un MVP.
-Funciona en producción de prueba con datos de ejemplo.
+El sistema migró del MVP a la nueva estructura de monorepo.
 
-Nota: durante la migración, este MVP se porta a la nueva estructura.
-El porte mantiene la equivalencia funcional.
-El detalle de la migración está en [roadmap.md](roadmap.md).
+## Tecnología
 
-## Tecnología actual
+- Monorepo con npm workspaces: `server/`, `client/`.
+- Server: Express 5 + TypeScript 5.9 + CommonJS (Node16).
+- Base de datos: PostgreSQL 16 con Prisma 7 (driver adapters).
+- Cliente: React 19 + Vite 8 + Tailwind 4 (CSS-first).
+- Autenticación JWT con roles (admin, manager, chatter).
+- Multi-tenant por agencia (`Agency`).
 
-- Node.js + Express (JavaScript, CommonJS).
-- Base de datos SQLite con `node:sqlite` nativo.
-- Frontend en HTML, CSS y JavaScript plano.
-- No hay TypeScript. No hay autenticación real.
-
-## Estructura del backend
+## Estructura del server
 
 | Archivo | Función |
 |---|---|
-| `src/server.js` | Entrada del servidor. Sirve `public/` y monta la API en `/api`. |
-| `src/db.js` | Crea la base de datos y las tablas. |
-| `src/routes.js` | Define los endpoints de la API. |
-| `src/providers/` | Capa de proveedor de voz. Desacoplada del resto. |
-| `src/providers/elevenlabs.js` | Llama a la API de ElevenLabs para generar audio. |
-| `src/audioStore.js` | Calcula el hash del texto. Guarda y lee los archivos MP3. |
-| `src/seed.js` | Carga datos de prueba. |
+| `server/src/index.ts` | Entrada del servidor. Monta los routers en `/api`. |
+| `server/prisma/schema.prisma` | Schema de datos con enums y convenciones. |
+| `server/prisma/seed.ts` | Datos de prueba idempotentes. |
+| `server/src/prisma.ts` | Singleton del cliente Prisma con adapter Postgres. |
+| `server/src/middleware/auth.ts` | `requireAuth` y `requireRole` con JWT. |
+| `server/src/routes/auth.ts` | Login. |
+| `server/src/routes/models.ts` | CRUD de modelos con scope por rol. |
+| `server/src/routes/phrases.ts` | CRUD de frases. |
+| `server/src/routes/consent.ts` | Registro de consentimiento. |
+| `server/src/routes/generate.ts` | Generación de audio (MP3). |
+| `server/src/routes/usage.ts` | Resumen de uso por chatter y por modelo. |
+| `server/src/services/ttsService.ts` | Lógica de generación: límites, caché, consentimiento, acceso. |
+| `server/src/providers/` | Capa desacoplada de proveedor de voz (ElevenLabs). |
+| `server/src/audioStore.ts` | Hash de texto y almacenamiento de archivos MP3. |
 
 ## Tablas de la base de datos
 
 | Tabla | Función |
 |---|---|
-| `models` | Modelos con su `voice_id` de ElevenLabs. |
+| `agencies` | Agencias multi-tenant. |
+| `models` | Modelos. Pertenece a una agencia. |
+| `voices` | Voces clonadas. Pertenece a un modelo. |
+| `chatters` | Usuarios con email/password, rol y límite diario. |
+| `model_chatter_access` | Asignación many-to-many entre chatter y modelo. |
+| `generations` | Registro de cada generación de audio. |
+| `audio_cache` | Caché de audios. Evita pagar dos veces la misma frase. |
 | `model_consent` | Consentimiento firmado de cada modelo. |
-| `chatters` | Usuarios que generan audios. Tienen un límite diario. |
-| `phrases` | Frases pre-armadas para los chatters. |
-| `audio_cache` | Caché de audios generados. Evita pagar dos veces por la misma frase. |
-| `usage_log` | Registro de uso por chatter y modelo. |
+| `phrases` | Frases pre-armadas. |
 
 ## Endpoints de la API
 
-| Método | Ruta | Función |
-|---|---|---|
-| GET | `/api/models` | Lista los modelos activos. |
-| POST | `/api/models` | Crea un modelo. |
-| GET | `/api/phrases` | Lista las frases. |
-| POST | `/api/phrases` | Crea una frase. |
-| POST | `/api/model-consent` | Crea un registro de consentimiento. |
-| POST | `/api/generate` | Genera un audio. Devuelve el MP3. |
-| GET | `/api/usage/summary` | Resumen de uso por chatter y por modelo. |
+| Método | Ruta | Auth | Función |
+|---|---|---|---|
+| POST | `/api/auth/login` | No | Login. Devuelve token JWT + usuario. |
+| GET | `/api/models` | Sí | Lista modelos. Chatter ve solo sus asignadas. |
+| POST | `/api/models` | admin/manager | Crea un modelo con su primera voz. |
+| GET | `/api/phrases` | Sí | Lista las frases. |
+| POST | `/api/phrases` | Sí | Crea una frase. |
+| POST | `/api/model-consent` | admin/manager | Registra consentimiento. |
+| POST | `/api/generate` | Sí | Genera audio. Verifica acceso chatter↔modelo. |
+| GET | `/api/usage/summary` | admin/manager | Uso por chatter hoy y por modelo este mes. |
 
 ## Flujo de generación de audio
 
-1. La API recibe `chatter_id`, `model_id` y `text`.
+1. La API recibe `model_id` y `text`. El `chatter_id` viene del token JWT.
 2. Verifica que el chatter existe y está activo.
 3. Verifica que el modelo existe y está activo.
-4. Verifica que el modelo tiene consentimiento. Si no lo tiene, devuelve `403`.
-5. Calcula los caracteres usados hoy por el chatter.
-6. Compara con el límite diario. Si lo supera, devuelve `429`.
-7. Calcula el hash del texto.
-8. Busca el audio en la caché.
-9. Si existe en la caché, lo devuelve sin gastar cuota.
-10. Si no existe, llama al proveedor de voz.
-11. Guarda el MP3 en `data/audio/`.
-12. Guarda el registro en `audio_cache` y en `usage_log`.
-13. Devuelve el MP3 con el encabezado `X-Audio-Source`.
+4. Si el chatter tiene rol `chatter`, verifica el acceso (`ModelChatterAccess`). Sin acceso → `403`.
+5. Verifica que el modelo tiene consentimiento. Sin consentimiento → `403`.
+6. Busca una voz `lista` para ese modelo. Sin voz → `422`.
+7. Calcula los caracteres usados hoy por el chatter.
+8. Compara con el límite diario. Si lo supera, devuelve `429`.
+9. Calcula el hash del texto.
+10. Busca el audio en la caché por modelo + hash.
+11. Si existe en la caché, lo devuelve sin gastar cuota.
+12. Si no existe, llama al proveedor (ElevenLabs).
+13. Guarda el MP3 en `server/data/audio/`.
+14. Guarda el registro en `audio_cache` y en `generations`.
+15. Devuelve el MP3 con el encabezado `X-Audio-Source`.
 
-## Reglas de negocio actuales
+## Reglas de negocio
 
 - Una modelo sin consentimiento no genera audio. Devuelve `403`.
-- El límite diario por defecto es 20.000 caracteres.
+- Una chatter sin acceso asignado a la modelo no genera audio. Devuelve `403`.
+- El límite diario por defecto es 20.000 caracteres. Superarlo devuelve `429`.
 - La caché no gasta cuota. Solo la primera generación gasta cuota.
 - El resumen de uso no cuenta los caracteres de la caché.
 
-## Frontend
+## Cliente
 
-| Página | Ruta | Función |
-|---|---|---|
-| Generador | `/` | La chatter elige modelo, escribe texto y genera el audio. |
-| Panel de manager | `/manager.html` | Muestra dos tablas de uso y un formulario para crear modelos. |
+El cliente React corre en `http://localhost:5173` (dev).
+Es mínimo: login, ver modelos, ver uso, ver frases y generar audio.
+Sirve para verificar el funcionamiento de la API.
 
 ## Pendientes conocidos
 
-- No hay autenticación real. El `chatter_id` se ingresa a mano.
-- No hay control de acceso por rol.
-- Los audios se guardan en el filesystem local.
+- Panel de administración completo (asignar chatters a modelos, costos).
+- Frontend React completo (hoy es un cliente de verificación).
+- Gestión de voces (subir samples, clonar, preview en ElevenLabs).
+- Subir `server/data/audio` a S3-compatible si el despliegue no tiene disco persistente.
