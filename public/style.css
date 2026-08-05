@@ -89,3 +89,56 @@ button:disabled {
   color: var(--accent);
   font-size: 14px;
 }
+
+/* --- Panel Manager --- */
+
+.manager {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 32px 20px 80px;
+}
+
+.manager section {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.manager section h2 {
+  font-size: 15px;
+  margin: 0 0 4px;
+}
+
+.manager section .sub {
+  color: var(--ink-soft);
+  font-size: 13px;
+  margin: 0 0 16px;
+}
+
+.manager table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.manager th,
+.manager td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.manager th {
+  color: var(--ink-soft);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.manager td:last-child,
+.manager th:last-child {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
