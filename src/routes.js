@@ -14,6 +14,24 @@ router.get("/models", (req, res) => {
   res.json(models);
 });
 
+router.post("/models", (req, res) => {
+  const { name, provider = "elevenlabs", voice_id } = req.body;
+  if (!name || !voice_id) return res.status(400).json({ error: "name y voice_id son requeridos" });
+
+  try {
+    const info = db
+      .prepare("INSERT INTO models (name, provider, voice_id) VALUES (?, ?, ?)")
+      .run(name, provider, voice_id);
+    res.status(201).json({ id: info.lastInsertRowid, name, provider, voice_id });
+  } catch (err) {
+    if (String(err.message).includes("UNIQUE")) {
+      return res.status(409).json({ error: "Ya existe un modelo con ese nombre" });
+    }
+    console.error(err);
+    res.status(500).json({ error: "Error guardando el modelo" });
+  }
+});
+
 // ---- Frases pre-armadas ----
 
 router.get("/phrases", (req, res) => {
@@ -28,6 +46,43 @@ router.post("/phrases", (req, res) => {
     .prepare("INSERT INTO phrases (label, text) VALUES (?, ?)")
     .run(label, text);
   res.status(201).json({ id: info.lastInsertRowid, label, text });
+});
+
+// ---- Consentimiento de la modelo ----
+
+router.post("/model-consent", (req, res) => {
+  const {
+    model_id,
+    signed_document_path,
+    verification_audio_path,
+    consented_at,
+    commercial_use,
+    notes,
+  } = req.body;
+
+  if (!model_id || !signed_document_path || !consented_at) {
+    return res.status(400).json({ error: "model_id, signed_document_path y consented_at son requeridos" });
+  }
+
+  const model = db.prepare("SELECT id FROM models WHERE id = ?").get(model_id);
+  if (!model) return res.status(404).json({ error: "Modelo no encontrado" });
+
+  const info = db
+    .prepare(
+      `INSERT INTO model_consent
+         (model_id, signed_document_path, verification_audio_path, consented_at, commercial_use, notes)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    )
+    .run(
+      model_id,
+      signed_document_path,
+      verification_audio_path || null,
+      consented_at,
+      commercial_use ? 1 : 0,
+      notes || null
+    );
+
+  res.status(201).json({ id: info.lastInsertRowid, model_id });
 });
 
 // ---- Generación de audio ----
