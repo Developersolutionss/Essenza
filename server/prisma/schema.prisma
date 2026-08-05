@@ -1,0 +1,147 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ChatterRole {
+  admin
+  manager
+  chatter
+}
+
+enum VoiceStatus {
+  en_preparacion
+  lista
+  fallida
+}
+
+model Agency {
+  id        Int      @id @default(autoincrement())
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  models   Model[]
+  chatters Chatter[]
+
+  @@map("agencies")
+}
+
+model Model {
+  id        Int      @id @default(autoincrement())
+  agencyId  Int      @map("agency_id")
+  agency    Agency   @relation(fields: [agencyId], references: [id])
+  name      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  voices      Voice[]
+  consents    ModelConsent[]
+  accesses    ModelChatterAccess[]
+  audioCaches AudioCache[]
+  generations Generation[]
+
+  @@map("models")
+}
+
+model Voice {
+  id                Int        @id @default(autoincrement())
+  modelId           Int        @map("model_id")
+  model             Model      @relation(fields: [modelId], references: [id])
+  elevenlabsVoiceId String     @map("elevenlabs_voice_id")
+  status            VoiceStatus @default(en_preparacion)
+  createdAt         DateTime   @default(now()) @map("created_at")
+
+  generations Generation[]
+
+  @@map("voices")
+}
+
+model Chatter {
+  id             Int         @id @default(autoincrement())
+  agencyId       Int?        @map("agency_id")
+  agency         Agency?     @relation(fields: [agencyId], references: [id])
+  name           String
+  email          String      @unique
+  passwordHash   String      @map("password_hash")
+  role           ChatterRole @default(chatter)
+  dailyCharLimit Int         @default(20000) @map("daily_char_limit")
+  active         Boolean     @default(true)
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  accesses    ModelChatterAccess[]
+  generations Generation[]
+
+  @@map("chatters")
+}
+
+model ModelChatterAccess {
+  id        Int     @id @default(autoincrement())
+  modelId   Int     @map("model_id")
+  model     Model   @relation(fields: [modelId], references: [id])
+  chatterId Int     @map("chatter_id")
+  chatter   Chatter @relation(fields: [chatterId], references: [id])
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([modelId, chatterId])
+  @@map("model_chatter_access")
+}
+
+model Generation {
+  id        Int      @id @default(autoincrement())
+  chatterId Int      @map("chatter_id")
+  chatter   Chatter  @relation(fields: [chatterId], references: [id])
+  modelId   Int      @map("model_id")
+  model     Model    @relation(fields: [modelId], references: [id])
+  voiceId   Int      @map("voice_id")
+  voice     Voice    @relation(fields: [voiceId], references: [id])
+  text      String
+  audioUrl  String   @map("audio_url")
+  charCount Int      @map("char_count")
+  fromCache Boolean  @default(false) @map("from_cache")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("generations")
+}
+
+model Phrase {
+  id        Int      @id @default(autoincrement())
+  label     String
+  text      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("phrases")
+}
+
+model AudioCache {
+  id        Int      @id @default(autoincrement())
+  modelId   Int      @map("model_id")
+  model     Model    @relation(fields: [modelId], references: [id])
+  textHash  String   @map("text_hash")
+  text      String
+  filePath  String   @map("file_path")
+  charCount Int      @map("char_count")
+  hits      Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([modelId, textHash])
+  @@map("audio_cache")
+}
+
+model ModelConsent {
+  id                    Int      @id @default(autoincrement())
+  modelId               Int      @map("model_id")
+  model                 Model    @relation(fields: [modelId], references: [id])
+  signedDocumentPath    String   @map("signed_document_path")
+  verificationAudioPath String?  @map("verification_audio_path")
+  consentedAt           DateTime @map("consented_at")
+  commercialUse         Boolean  @default(true) @map("commercial_use")
+  notes                 String?
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  @@map("model_consent")
+}

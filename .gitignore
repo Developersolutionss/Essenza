@@ -3,3 +3,7 @@ data/
 .env
 *.log
 docs/branch-flow.md
+server/src/generated/
+server/dist/
+client/dist/
+*.tsbuildinfo

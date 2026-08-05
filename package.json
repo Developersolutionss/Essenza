@@ -1,18 +1,26 @@
 {
-  "name": "essensa-voice-notes",
-  "version": "0.1.0",
-  "description": "Generador de audios con voz clonada para chatters de agencia OF",
-  "main": "src/server.js",
-  "type": "commonjs",
+  "name": "essenza-voice-notes",
+  "private": true,
+  "version": "0.2.0",
+  "workspaces": [
+    "server",
+    "client"
+  ],
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "dev": "npm run dev --workspace=server & npm run dev --workspace=client",
+    "dev:server": "npm run dev --workspace=server",
+    "dev:client": "npm run dev --workspace=client",
+    "build": "npm run build --workspace=server && npm run build --workspace=client",
+    "test": "npm run test --workspace=server && npm run test --workspace=client",
+    "prisma:migrate": "npm run prisma:migrate --workspace=server",
+    "prisma:seed": "npm run prisma:seed --workspace=server"
+  },
+  "allowScripts": {
+    "prisma@7.9.1": true,
+    "@prisma/engines@7.9.1": true,
+    "esbuild@0.28.1": true
   },
   "engines": {
-    "node": ">=22.5.0"
-  },
-  "dependencies": {
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2"
+    "node": ">=22.12.0"
   }
 }
