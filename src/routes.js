@@ -1,7 +1,6 @@
 const express = require("express");
 const db = require("./db");
-const audioStore = require("./audioStore");
-const { getProvider } = require("./providers");
+const { generateAudio, GenerationError } = require("./generator");
 
 const router = express.Router();
 
@@ -32,88 +31,23 @@ router.post("/phrases", (req, res) => {
 
 // ---- Generación de audio ----
 
-const DEFAULT_DAILY_LIMIT = 20000;
-
 router.post("/generate", async (req, res) => {
   const { chatter_id, model_id, text } = req.body;
-
-  if (!chatter_id || !model_id || !text || !text.trim()) {
-    return res.status(400).json({ error: "chatter_id, model_id y text son requeridos" });
-  }
-
-  const chatter = db.prepare("SELECT * FROM chatters WHERE id = ? AND active = 1").get(chatter_id);
-  if (!chatter) return res.status(404).json({ error: "Chatter no encontrado o inactivo" });
-
-  const model = db.prepare("SELECT * FROM models WHERE id = ? AND active = 1").get(model_id);
-  if (!model) return res.status(404).json({ error: "Modelo no encontrado o inactivo" });
-
-  const consent = db
-    .prepare("SELECT id FROM model_consent WHERE model_id = ? ORDER BY created_at DESC LIMIT 1")
-    .get(model_id);
-  if (!consent) {
-    return res.status(403).json({
-      error: "Esta modelo no tiene un registro de consentimiento cargado. No se puede generar audio.",
-    });
-  }
-
-  const charCount = text.trim().length;
-
-  const usedToday = db
-    .prepare(
-      `SELECT COALESCE(SUM(char_count), 0) AS total
-       FROM usage_log
-       WHERE chatter_id = ? AND from_cache = 0 AND date(created_at) = date('now')`
-    )
-    .get(chatter_id).total;
-
-  const limit = chatter.daily_char_limit || DEFAULT_DAILY_LIMIT;
-  if (usedToday + charCount > limit) {
-    return res.status(429).json({
-      error: `Límite diario de caracteres alcanzado (${usedToday}/${limit}). Hablá con tu manager si necesitás más.`,
-    });
-  }
-
-  const textHash = audioStore.hashText(text);
-
-  // 1) Buscar en caché primero — no le pagamos al proveedor dos veces la misma frase.
-  const cached = db
-    .prepare("SELECT * FROM audio_cache WHERE model_id = ? AND text_hash = ?")
-    .get(model_id, textHash);
-
-  if (cached) {
-    db.prepare("UPDATE audio_cache SET hits = hits + 1 WHERE id = ?").run(cached.id);
-    db.prepare(
-      "INSERT INTO usage_log (chatter_id, model_id, char_count, from_cache) VALUES (?, ?, ?, 1)"
-    ).run(chatter_id, model_id, charCount);
-
-    const buffer = audioStore.read(cached.file_path);
-    res.setHeader("Content-Type", "audio/mpeg");
-    res.setHeader("X-Audio-Source", "cache");
-    return res.send(buffer);
-  }
-
-  // 2) No está en caché: generar con el proveedor configurado para este modelo.
   try {
-    const provider = getProvider(model.provider);
-    const buffer = await provider.generate({ voiceId: model.voice_id, text });
-
-    const filePath = audioStore.save(model_id, textHash, buffer);
-
-    db.prepare(
-      `INSERT INTO audio_cache (model_id, text_hash, text, file_path, char_count)
-       VALUES (?, ?, ?, ?, ?)`
-    ).run(model_id, textHash, text, filePath, charCount);
-
-    db.prepare(
-      "INSERT INTO usage_log (chatter_id, model_id, char_count, from_cache) VALUES (?, ?, ?, 0)"
-    ).run(chatter_id, model_id, charCount);
-
+    const { buffer, source } = await generateAudio({
+      chatterId: chatter_id,
+      modelId: model_id,
+      text,
+    });
     res.setHeader("Content-Type", "audio/mpeg");
-    res.setHeader("X-Audio-Source", "generated");
+    res.setHeader("X-Audio-Source", source);
     res.send(buffer);
   } catch (err) {
+    if (err instanceof GenerationError) {
+      return res.status(err.status).json({ error: err.message, detail: err.detail });
+    }
     console.error(err);
-    res.status(502).json({ error: "Error generando audio con el proveedor de voz", detail: err.message });
+    res.status(500).json({ error: "Error interno" });
   }
 });
 

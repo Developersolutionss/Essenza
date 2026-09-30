@@ -2,6 +2,7 @@ require("dotenv").config();
 const path = require("path");
 const express = require("express");
 const routes = require("./routes");
+const { startDiscordBot } = require("./discord");
 
 const app = express();
 
@@ -13,3 +14,5 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Essensa voice notes corriendo en http://localhost:${PORT}`);
 });
+
+startDiscordBot().catch((err) => console.error("No se pudo iniciar el bot de Discord:", err.message));

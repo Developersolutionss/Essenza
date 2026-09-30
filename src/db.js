@@ -73,4 +73,11 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_cache_lookup ON audio_cache(model_id, text_hash);
 `);
 
+// Migración: vincular cada chatter con su usuario de Discord.
+const chatterCols = db.prepare("PRAGMA table_info(chatters)").all();
+if (!chatterCols.some((c) => c.name === "discord_id")) {
+  db.exec("ALTER TABLE chatters ADD COLUMN discord_id TEXT;");
+}
+db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_chatters_discord ON chatters(discord_id) WHERE discord_id IS NOT NULL;");
+
 module.exports = db;

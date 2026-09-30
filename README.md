@@ -15,6 +15,19 @@ npm run dev
 
 Abrir `http://localhost:3000`.
 
+## Bot de Discord
+
+Los chatters generan los audios desde Discord; la web queda como apoyo.
+El bot corre dentro del mismo proceso que el servidor y se activa si hay
+`DISCORD_TOKEN` y `DISCORD_CLIENT_ID` en `.env` (opcional `DISCORD_GUILD_ID`).
+
+1. Crear la aplicación en discord.com/developers/applications, agregar un Bot y copiar el token.
+2. Invitar el bot al servidor con los scopes `bot` y `applications.commands`.
+3. Un manager (permiso Gestionar servidor) vincula cada usuario con su chatter: `/vincular`.
+
+Comandos: `/voz modelo texto`, `/frase modelo frase`, `/uso`, `/vincular`.
+Las respuestas son efímeras (solo las ve quien las pidió) y el mp3 va adjunto.
+
 ## Antes de usar con una modelo real
 
 1. Clonar su voz en ElevenLabs (Instant Voice Clone) y copiar el `voice_id`.
@@ -27,6 +40,8 @@ Abrir `http://localhost:3000`.
 - `src/db.js` — schema SQLite (modelos, consentimiento, chatters, caché, uso).
 - `src/providers/` — capa de proveedor de voz, desacoplada para poder
   swapear ElevenLabs por otro proveedor sin tocar el resto del sistema.
+- `src/generator.js` — lógica única de generación (consentimiento, límite, caché), usada por web y bot.
+- `src/discord.js` — bot de Discord (comandos slash).
 - `src/routes.js` — API: modelos, frases, generación, resumen de uso.
 - `public/` — frontend simple para chatters.
 
