@@ -111,6 +111,18 @@ function zonedInstant(y, m, d, h, mi, zone) {
   const guess = Date.UTC(y, m - 1, d, h, mi);
   return guess - offset(guess - offset(guess));
 }
+// "05:30" + 450 min -> "13:00" (pasa la medianoche si hace falta).
+function addMinutesHHMM(hhmm, minutes) {
+  const [h, m] = hhmm.split(":").map(Number);
+  const t = (((h * 60 + m + minutes) % 1440) + 1440) % 1440;
+  return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+}
+// Minutos entre entrada y salida; si la salida es "antes", el turno cruza la medianoche.
+function minutesBetween(start, end) {
+  const toMin = (s) => s.split(":").map(Number).reduce((h, m) => h * 60 + m);
+  return (((toMin(end) - toMin(start)) % 1440) + 1440) % 1440;
+}
+
 // Hora de entrada de un turno (HH:MM en la zona de la agencia) vista en la zona elegida.
 function entryInViewZone(hhmm) {
   const [h, mi] = hhmm.split(":").map(Number);
@@ -478,7 +490,7 @@ function openTable(id, open, rules, compact = false) {
     if (!compact) r.push({ h: `<span class="mono">${fmtTime(s.startedAt)}</span>`, v: s.startedAt });
     r.push(statusPills(s));
     // El break permitido cuenta como trabajado: el contador solo se detiene al pasarse.
-    r.push({ h: tick(s.workedMs, !s.onBreak || s.breakMs < rules.breakMs) + (compact ? "" : ` <span class="dim">/ ${fmtDur(rules.shiftMs)}</span>`), v: s.workedMs });
+    r.push({ h: tick(s.workedMs, !s.onBreak || s.breakMs < rules.breakMs) + (compact ? "" : ` <span class="dim">/ ${fmtDur(s.requiredMs || rules.shiftMs)}</span>`), v: s.workedMs });
     r.push({ h: tick(s.breakMs, s.onBreak, rules.breakMs) + (compact ? "" : ` <span class="dim">/ ${fmtDur(rules.breakMs)}</span>`), v: s.breakMs });
     if (!compact) {
       r.push(
@@ -877,11 +889,15 @@ views.horarios = {
   render(d) {
     const tplRows = d.templates.map((t) => {
       const tid = esc(t.id);
+      const dur = t.durationMin || d.defaultDurationMin;
       return [
         `<label class="sr-only" for="tn-${tid}">Nombre del turno</label>
          <input id="tn-${tid}" class="f-tname" value="${esc(t.name)}" maxlength="40" style="width:160px" autocomplete="off" />`,
         `<label class="sr-only" for="ts-${tid}">Hora de entrada de ${esc(t.name)} (24 horas)</label>
          <input id="ts-${tid}" class="mono f-tstart" type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" value="${esc(t.startTime)}" style="width:96px" autocomplete="off" />`,
+        `<label class="sr-only" for="te-${tid}">Hora de salida de ${esc(t.name)} (24 horas)</label>
+         <input id="te-${tid}" class="mono f-tend" type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" value="${esc(addMinutesHHMM(t.startTime, dur))}" style="width:96px" autocomplete="off" />`,
+        `<span class="mono f-tdur">${fmtDur(dur * 60000)}</span>`,
         `<label class="sr-only" for="tg-${tid}">Minutos de gracia de ${esc(t.name)}</label>
          <input id="tg-${tid}" class="mono narrow f-tgrace" type="number" min="0" max="240" value="${esc(t.graceMin)}" />`,
         `<div class="row-actions" data-tpl="${tid}" data-name="${esc(t.name)}">
@@ -893,12 +909,16 @@ views.horarios = {
     const tplTbl = d.templates.length
       ? (() => {
         const otra = viewZone() !== state.tz;
-        const cols = [{ h: "Turno" }, { h: "Entrada (24 h)" }];
+        const cols = [{ h: "Turno" }, { h: "Entrada (24 h)" }, { h: "Salida (24 h)" }, { h: "Duración" }];
         if (otra) cols.push({ h: `En ${esc(viewZone().split("/").pop().replace(/_/g, " "))}` });
         cols.push({ h: "Gracia (min)" }, { h: "" });
-        const rows = tplRows.map((r, i) =>
-          otra ? [r[0], r[1], `<span class="mono">${entryInViewZone(d.templates[i].startTime)}</span>`, r[2], r[3]] : r
-        );
+        const rows = tplRows.map((r, i) => {
+          if (!otra) return r;
+          const t = d.templates[i];
+          const salida = addMinutesHHMM(t.startTime, t.durationMin || d.defaultDurationMin);
+          const zona = `<span class="mono">${entryInViewZone(t.startTime)} a ${entryInViewZone(salida)}</span>`;
+          return [r[0], r[1], r[2], r[3], zona, r[4], r[5]];
+        });
         return table("tpl", "Turnos fijos", cols, rows);
       })()
       : empty("No hay turnos. Crea el primero con el formulario de abajo.");
@@ -929,13 +949,14 @@ views.horarios = {
       <div class="note section">${ic("info")}<span>Nadie se configura uno por uno. Al pulsar <b>Start</b> el bot decide el turno, por este orden: <b>1)</b> su horario personal, si lo tiene; <b>2)</b> el turno escrito en su apodo del servidor (por ejemplo <b>Alejandro - Shift 2</b>); <b>3)</b> si su cargo es Team Leader, Jefe de Chat o Content Manager, no se mide; <b>4)</b> si nada de lo anterior, <b>por la hora a la que ficha</b>: el turno cuyo inicio queda más cerca. Con la hora sola, un retraso de más de 4 horas se confunde con llegar antes al turno siguiente: para esos casos conviene el turno en el apodo.</span></div>
 
       <section class="panel section" aria-labelledby="h-tpl"><div class="head"><h2 id="h-tpl">Turnos</h2></div>
-        <p class="sub">Hora de entrada de cada turno. Se mide la puntualidad frente a esta hora, más los minutos de gracia. Cambiar un turno no modifica los fichajes ya hechos.</p>
+        <p class="sub">La puntualidad se mide frente a la entrada, más los minutos de gracia. <b>End</b> se habilita al cumplir la duración del turno, contada desde que la persona pulsa Start (el break permitido cuenta). Cambiar un turno no modifica los fichajes ya iniciados.</p>
         ${tplTbl}</section>
 
       <section class="panel section" aria-labelledby="h-newtpl"><div class="head"><h2 id="h-newtpl">Agregar turno</h2></div>
         <form id="tplForm" class="row-form" novalidate>
           <div class="field"><label for="tp-name">Nombre</label><input id="tp-name" name="tplName" maxlength="40" autocomplete="off" aria-describedby="err-tplName" /><p class="field-error" id="err-tplName" role="alert"></p></div>
           <div class="field"><label for="tp-start">Entrada (24 h)</label><input id="tp-start" name="tplStart" class="mono" style="width:120px" inputmode="numeric" maxlength="5" placeholder="HH:MM" autocomplete="off" aria-describedby="err-tplStart" /><p class="field-error" id="err-tplStart" role="alert"></p></div>
+          <div class="field"><label for="tp-end">Salida (24 h)</label><input id="tp-end" name="tplEnd" class="mono" style="width:120px" inputmode="numeric" maxlength="5" placeholder="HH:MM" autocomplete="off" aria-describedby="err-tplEnd" /><p class="field-error" id="err-tplEnd" role="alert"></p></div>
           <div class="field"><label for="tp-grace">Gracia (min)</label><input id="tp-grace" name="tplGrace" class="mono narrow" type="number" min="0" max="240" value="${d.defaultGrace}" aria-describedby="err-tplGrace" /><p class="field-error" id="err-tplGrace" role="alert"></p></div>
           <button class="btn primary" type="submit">${ic("plus")}Agregar turno</button>
         </form></section>
@@ -966,6 +987,7 @@ function normalizeTime(v) {
 const RULES = {
   tplName: (v) => (v.trim() ? (v.trim().length <= 40 ? "" : "Máximo 40 caracteres.") : "Escribe el nombre del turno."),
   tplStart: (v) => (/^([01]\d|2[0-3]):[0-5]\d$/.test(normalizeTime(v)) ? "" : "Usa el formato de 24 horas, por ejemplo 05:00."),
+  tplEnd: (v) => (/^([01]\d|2[0-3]):[0-5]\d$/.test(normalizeTime(v)) ? "" : "Usa el formato de 24 horas, por ejemplo 13:00."),
   tplGrace: (v) => (Number.isInteger(Number(v)) && v !== "" && Number(v) >= 0 && Number(v) <= 240 ? "" : "Un número entre 0 y 240."),
   displayName: (v) => (v.trim() ? "" : "Escribe el nombre de la persona."),
   username: (v) => (/^[a-zA-Z0-9._-]{3,32}$/.test(v.trim()) ? "" : "Entre 3 y 32 caracteres: letras, números, punto, guion o guion bajo."),
@@ -1062,6 +1084,9 @@ async function load({ silent = false, routeChange = false } = {}) {
     if (data.tz) {
       state.tz = data.tz;
       updateTzLabel();
+      // El selector se dibuja antes de conocer la zona de la agencia: se corrige su texto.
+      const agencyOpt = document.querySelector('#viewtz option[value="agency"]');
+      if (agencyOpt) agencyOpt.textContent = `Hora de la agencia (${state.tz.split("/").pop().replace(/_/g, " ")})`;
     }
     state.charts.forEach((c) => c.destroy());
     state.charts = [];
@@ -1255,17 +1280,30 @@ $("#view").addEventListener("click", async (e) => {
       if (e.target.closest(".act-tsave")) {
         const nameIn = $(".f-tname", row);
         const startIn = $(".f-tstart", row);
+        const endIn = $(".f-tend", row);
         const graceIn = $(".f-tgrace", row);
         startIn.value = normalizeTime(startIn.value);
-        const err = RULES.tplName(nameIn.value) || RULES.tplStart(startIn.value) || RULES.tplGrace(graceIn.value);
-        if (err) {
-          msg.textContent = err;
-          return (RULES.tplName(nameIn.value) ? nameIn : RULES.tplStart(startIn.value) ? startIn : graceIn).focus();
+        endIn.value = normalizeTime(endIn.value);
+        const checks = [
+          [nameIn, RULES.tplName(nameIn.value)],
+          [startIn, RULES.tplStart(startIn.value)],
+          [endIn, RULES.tplEnd(endIn.value) || (minutesBetween(startIn.value, endIn.value) < 30 ? "El turno debe durar al menos 30 minutos." : "")],
+          [graceIn, RULES.tplGrace(graceIn.value)],
+        ];
+        const bad = checks.find(([, m]) => m);
+        if (bad) {
+          msg.textContent = bad[1];
+          return bad[0].focus();
         }
         const res = await api(`/api/admin/templates/${tid}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: nameIn.value.trim(), startTime: startIn.value, graceMin: Number(graceIn.value) }),
+          body: JSON.stringify({
+            name: nameIn.value.trim(),
+            startTime: startIn.value,
+            durationMin: minutesBetween(startIn.value, endIn.value),
+            graceMin: Number(graceIn.value),
+          }),
         });
         if (!res.ok) return (msg.textContent = (await res.json().catch(() => ({}))).error || "No se pudo guardar.");
         toast(`Turno ${nameIn.value.trim()} guardado`);
@@ -1427,8 +1465,18 @@ $("#view").addEventListener("click", async (e) => {
 $("#view").addEventListener("focusout", (e) => {
   const input = e.target;
   if (!input.form || !input.form.matches("#addForm, #userForm, #passForm, #tplForm") || !RULES[input.name]) return;
-  if (input.name === "start" || input.name === "tplStart") input.value = normalizeTime(input.value);
+  if (["start", "tplStart", "tplEnd"].includes(input.name)) input.value = normalizeTime(input.value);
   if (input.value !== "" || input.getAttribute("aria-invalid") === "true") setError(input, RULES[input.name](input.value));
+});
+
+// En la tabla de turnos, la duración se recalcula al cambiar la entrada o la salida.
+$("#view").addEventListener("input", (e) => {
+  if (!e.target.matches(".f-tstart, .f-tend")) return;
+  const row = e.target.closest("tr");
+  const start = normalizeTime($(".f-tstart", row).value);
+  const end = normalizeTime($(".f-tend", row).value);
+  const ok = !RULES.tplStart(start) && !RULES.tplEnd(end);
+  $(".f-tdur", row).textContent = ok ? fmtDur(minutesBetween(start, end) * 60000) : "—";
 });
 
 $("#view").addEventListener("submit", async (e) => {
@@ -1437,9 +1485,14 @@ $("#view").addEventListener("submit", async (e) => {
     e.preventDefault();
     const f = e.target;
     f.elements.tplStart.value = normalizeTime(f.elements.tplStart.value);
+    f.elements.tplEnd.value = normalizeTime(f.elements.tplEnd.value);
     let bad = null;
-    for (const n of ["tplName", "tplStart", "tplGrace"]) {
+    for (const n of ["tplName", "tplStart", "tplEnd", "tplGrace"]) {
       if (setError(f.elements[n], RULES[n](f.elements[n].value)) && !bad) bad = f.elements[n];
+    }
+    if (!bad && minutesBetween(f.elements.tplStart.value, f.elements.tplEnd.value) < 30) {
+      setError(f.elements.tplEnd, "El turno debe durar al menos 30 minutos.");
+      bad = f.elements.tplEnd;
     }
     if (bad) return bad.focus();
     const res = await api("/api/admin/templates", {
@@ -1448,6 +1501,7 @@ $("#view").addEventListener("submit", async (e) => {
       body: JSON.stringify({
         name: f.elements.tplName.value.trim(),
         startTime: f.elements.tplStart.value,
+        durationMin: minutesBetween(f.elements.tplStart.value, f.elements.tplEnd.value),
         graceMin: Number(f.elements.tplGrace.value),
       }),
     });

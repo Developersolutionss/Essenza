@@ -126,7 +126,7 @@ db.exec(`
   );
 `);
 
-// Turnos fijos (Shift 1, 2, 3...). Cada persona se asigna sola por su rol de Discord.
+// Turnos fijos (Shift 1, 2, 3...). Ver src/shiftPlan.js para cómo se asigna cada persona.
 db.exec(`
   CREATE TABLE IF NOT EXISTS shift_templates (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -143,14 +143,20 @@ if (!shiftCols.includes("template_name")) db.exec("ALTER TABLE shifts ADD COLUMN
 if (!shiftCols.includes("expected_at")) db.exec("ALTER TABLE shifts ADD COLUMN expected_at INTEGER;");
 if (!shiftCols.includes("grace_minutes")) db.exec("ALTER TABLE shifts ADD COLUMN grace_minutes INTEGER;");
 if (!shiftCols.includes("plan_source")) db.exec("ALTER TABLE shifts ADD COLUMN plan_source TEXT;"); // personal | apodo | hora | exento
+// Minutos de turno exigidos para poder pulsar End, fijados al iniciar el fichaje.
+if (!shiftCols.includes("required_minutes")) db.exec("ALTER TABLE shifts ADD COLUMN required_minutes INTEGER;");
 
-// Turnos de la agencia, en hora de Venezuela: 8 horas cada uno.
+// Cada turno tiene su propia duración (en minutos). Sin valor se usa SHIFT_HOURS.
+const tplCols = db.prepare("PRAGMA table_info(shift_templates)").all().map((c) => c.name);
+if (!tplCols.includes("duration_minutes")) db.exec("ALTER TABLE shift_templates ADD COLUMN duration_minutes INTEGER;");
+
+// Turnos de la agencia, en hora de Venezuela.
 if (db.prepare("SELECT COUNT(*) AS n FROM shift_templates").get().n === 0) {
   const grace = Number(process.env.LATE_GRACE_MINUTES || 10);
-  const ins = db.prepare("INSERT INTO shift_templates (name, start_time, grace_minutes) VALUES (?, ?, ?)");
-  ins.run("Shift 1", "05:30", grace);
-  ins.run("Shift 2", "13:00", grace);
-  ins.run("Shift 3", "21:15", grace);
+  const ins = db.prepare("INSERT INTO shift_templates (name, start_time, grace_minutes, duration_minutes) VALUES (?, ?, ?, ?)");
+  ins.run("Shift 1", "05:30", grace, 450); // 05:30 a 13:00
+  ins.run("Shift 2", "13:00", grace, 495); // 13:00 a 21:15
+  ins.run("Shift 3", "21:15", grace, 480); // 21:15 a 05:15, hasta que llega la mañana
 }
 
 // Migración: vincular cada chatter con su usuario de Discord.

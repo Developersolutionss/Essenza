@@ -18,7 +18,12 @@ const tzu = require("./timezone");
 const DEFAULT_GRACE = () => Number(process.env.LATE_GRACE_MINUTES || 10);
 
 function listTemplates() {
-  return db.prepare("SELECT id, name, start_time AS startTime, grace_minutes AS graceMin FROM shift_templates ORDER BY start_time, name").all();
+  return db
+    .prepare(
+      `SELECT id, name, start_time AS startTime, grace_minutes AS graceMin, duration_minutes AS durationMin
+       FROM shift_templates ORDER BY start_time, name`
+    )
+    .all();
 }
 
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -64,12 +69,14 @@ function planFor(template, source, startedAt) {
     templateName: template.name,
     startTime: template.startTime,
     graceMin: template.graceMin,
+    durationMin: template.durationMin || null,
     expectedAt: tzu.expectedStart(startedAt, template.startTime),
   };
 }
 
 // Devuelve el plan de esta persona para un fichaje que empieza en `startedAt`:
-//   { source: "personal" | "apodo" | "hora" | "exento", templateName, startTime, graceMin, expectedAt }
+//   { source: "personal" | "apodo" | "hora" | "exento", templateName, startTime, graceMin, durationMin, expectedAt }
+// durationMin null = se exige la duración general (SHIFT_HOURS).
 // "exento" no trae hora esperada. Devuelve null si no hay forma de medir (menos de
 // dos turnos definidos y sin apodo).
 function resolveForStart({ discordId, names = [], startedAt }) {

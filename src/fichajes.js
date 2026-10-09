@@ -15,7 +15,8 @@ function fmt(ms) {
   const totalMin = Math.max(0, Math.round(ms / 60000));
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
-  return h ? `${h} h ${m} min` : `${m} min`;
+  if (!h) return `${m} min`;
+  return m ? `${h} h ${m} min` : `${h} h`;
 }
 
 // Panel fijo del canal: botones + quién está en turno ahora.
@@ -52,8 +53,8 @@ function panelPayload() {
     .setTitle("🕐 Fichajes")
     .setColor(0x3e6259)
     .setDescription(
-      `Pulsa **Start** para iniciar tu turno.\n` +
-        `Debes completar **${fmt(shifts.SHIFT_MS)}** de turno para poder pulsar **End**. ` +
+      `Pulsa **Start** para iniciar tu turno. Podrás pulsar **End** al cumplir la duración de tu turno ` +
+        `(hora de Venezuela):\n${turnosText()}\n` +
         `Tienes **un solo break** por turno, de **${fmt(shifts.BREAK_MS)}**: cuenta como trabajado, ` +
         `pero si te pasas, el exceso se descuenta y tienes que recuperarlo.`
     )
@@ -72,10 +73,31 @@ function panelPayload() {
   return { embeds: [embed], components: [row] };
 }
 
+// "05:30" + 450 min -> "13:00" (pasa la medianoche si hace falta).
+function addMinutes(hhmm, minutes) {
+  const [h, m] = hhmm.split(":").map(Number);
+  const t = (((h * 60 + m + minutes) % 1440) + 1440) % 1440;
+  return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+}
+
+// Lista de turnos para el panel: "• Shift 1: 05:30 a 13:00 (7 h 30 min)".
+function turnosText() {
+  const list = plans.listTemplates();
+  if (!list.length) return `• Turno general: ${fmt(shifts.SHIFT_MS)}`;
+  return list
+    .map((t) => {
+      const min = t.durationMin || shifts.SHIFT_MS / 60000;
+      return `• ${t.name}: ${t.startTime} a ${addMinutes(t.startTime, min)} (${fmt(min * 60000)})`;
+    })
+    .join("\n");
+}
+
 function statusText(st) {
   return (
-    `Turno desde ${ts(st.shift.started_at)}.\n` +
-    `Trabajado: **${fmt(st.workedMs)}** de ${fmt(shifts.SHIFT_MS)}.\n` +
+    `Turno desde ${ts(st.shift.started_at)}` +
+    (st.shift.template_name ? ` (${st.shift.template_name})` : "") +
+    `.\n` +
+    `Trabajado: **${fmt(st.workedMs)}** de ${fmt(st.requiredMs)}.\n` +
     `Break: **${fmt(st.breakMs)}** de ${fmt(shifts.BREAK_MS)}` +
     (st.onBreak ? " (estás en break ahora)" : "") +
     (st.breakOverMs ? `\n⚠️ Exceso de break: **${fmt(st.breakOverMs)}**.` : "") +
@@ -96,9 +118,10 @@ function runAction(action, discordId, name, names = []) {
       const r = shifts.startShift(discordId, name, now, plan);
       if (!r.ok) return `❌ Ya tienes un turno abierto desde ${ts(r.shift?.started_at ?? Date.now())}.`;
 
+      const requiredMs = shifts.statusOf(discordId, now)?.requiredMs ?? shifts.SHIFT_MS;
       let msg =
         `✅ Turno iniciado a las ${ts(r.shift.started_at)}.\n` +
-        `Podrás pulsar **End** a las ${ts(r.shift.started_at + shifts.SHIFT_MS)}, al cumplir ${fmt(shifts.SHIFT_MS)} ` +
+        `Podrás pulsar **End** a las ${ts(r.shift.started_at + requiredMs)}, al cumplir ${fmt(requiredMs)} ` +
         `(el break de ${fmt(shifts.BREAK_MS)} cuenta; solo se suma lo que te pases).`;
 
       if (plan?.source === "exento") {
@@ -149,7 +172,7 @@ function runAction(action, discordId, name, names = []) {
         if (r.reason === "no_shift") return "❌ No tienes un turno abierto.";
         if (r.reason === "on_break") return "❌ Estás en break. Pulsa **Resume** y luego **End**.";
         return (
-          `⛔ Aún no puedes terminar. Llevas **${fmt(r.st.workedMs)}** de ${fmt(shifts.SHIFT_MS)}; ` +
+          `⛔ Aún no puedes terminar. Llevas **${fmt(r.st.workedMs)}** de ${fmt(r.st.requiredMs)}; ` +
           `te faltan **${fmt(r.st.remainingMs)}** (a partir de ${ts(Date.now() + r.st.remainingMs)}).`
         );
       }

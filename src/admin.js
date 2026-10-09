@@ -177,6 +177,7 @@ function enrichShifts(list) {
       startedAt: o.shift.started_at,
       endedAt: o.shift.ended_at,
       workedMs: o.workedMs,
+      requiredMs: o.requiredMs,
       breakMs: o.breakMs,
       breakOverMs: o.breakOverMs,
       onBreak: o.onBreak,
@@ -487,6 +488,7 @@ router.get("/schedules", requireAuth, (req, res) => {
     tz: tzu.getTz(),
     tzLabel: plans.tzLabel(),
     defaultGrace: plans.DEFAULT_GRACE(),
+    defaultDurationMin: shifts.SHIFT_MS / 60000,
     templates: plans.listTemplates(),
     people,
   });
@@ -525,14 +527,22 @@ router.delete("/schedules/:discordId", requireAdmin, (req, res) => {
 // Turnos fijos (Shift 1, 2, 3...): solo administradores
 // ---------------------------------------------------------------------------
 
-function checkTemplate({ name, startTime, graceMin }) {
+function checkTemplate({ name, startTime, graceMin, durationMin }) {
   if (!String(name || "").trim()) return "Escribe el nombre del turno.";
   if (String(name).trim().length > 40) return "El nombre del turno es demasiado largo.";
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(String(startTime || ""))) return "La hora debe ser HH:MM, en 24 horas.";
   const g = Number(graceMin);
   if (!Number.isInteger(g) || g < 0 || g > 240) return "La gracia debe ser un número entre 0 y 240 minutos.";
+  if (durationMin !== undefined && durationMin !== null) {
+    const d = Number(durationMin);
+    if (!Number.isInteger(d) || d < 30 || d > 24 * 60) return "La duración debe estar entre 30 minutos y 24 horas.";
+  }
   return "";
 }
+
+// Duración enviada (en minutos) o null si no se envía.
+const durationOf = (body) =>
+  body.durationMin === undefined || body.durationMin === null ? null : Number(body.durationMin);
 
 router.post("/templates", requireAdmin, (req, res) => {
   const bad = checkTemplate(req.body || {});
@@ -541,8 +551,8 @@ router.post("/templates", requireAdmin, (req, res) => {
   if (db.prepare("SELECT 1 FROM shift_templates WHERE name = ?").get(name)) {
     return res.status(409).json({ error: "Ya existe un turno con ese nombre." });
   }
-  db.prepare("INSERT INTO shift_templates (name, start_time, grace_minutes) VALUES (?, ?, ?)")
-    .run(name, req.body.startTime, Number(req.body.graceMin));
+  db.prepare("INSERT INTO shift_templates (name, start_time, grace_minutes, duration_minutes) VALUES (?, ?, ?, ?)")
+    .run(name, req.body.startTime, Number(req.body.graceMin), durationOf(req.body));
   res.status(201).json({ ok: true });
 });
 
@@ -556,8 +566,11 @@ router.put("/templates/:id", requireAdmin, (req, res) => {
   const name = String(req.body.name).trim();
   const clash = db.prepare("SELECT id FROM shift_templates WHERE name = ? AND id != ?").get(name, id);
   if (clash) return res.status(409).json({ error: "Ya existe un turno con ese nombre." });
-  db.prepare("UPDATE shift_templates SET name = ?, start_time = ?, grace_minutes = ? WHERE id = ?")
-    .run(name, req.body.startTime, Number(req.body.graceMin), id);
+  // Si no se envía la duración, se conserva la que tenía.
+  const current = db.prepare("SELECT duration_minutes FROM shift_templates WHERE id = ?").get(id);
+  const duration = req.body.durationMin === undefined ? current.duration_minutes : durationOf(req.body);
+  db.prepare("UPDATE shift_templates SET name = ?, start_time = ?, grace_minutes = ?, duration_minutes = ? WHERE id = ?")
+    .run(name, req.body.startTime, Number(req.body.graceMin), duration, id);
   res.json({ ok: true });
 });
 

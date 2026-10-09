@@ -44,11 +44,13 @@ las pidió) y el mp3 va adjunto.
 **Break**, **Resume**, **End** y **Mi estado**, más la lista de quién está en
 turno o en break, y lo fija en el canal.
 
-- Para pulsar **End** hay que cumplir 8 h de turno. El break de 30 min es tiempo pagado y
-  cuenta como trabajado: no hay que recuperarlo. Solo el exceso de break se descuenta, y
-  ese sí hay que recuperarlo antes de poder pulsar End.
+- Para pulsar **End** hay que cumplir la duración del propio turno (ver la tabla de turnos),
+  contada desde que se pulsa Start: quien llega tarde sale más tarde. Quien no tiene turno
+  (cargos exentos, horario personal) cumple la duración general, `SHIFT_HOURS` (8 h).
+- El break de 30 min es tiempo pagado y cuenta como trabajado: no hay que recuperarlo.
+  Solo el exceso se descuenta, y ese sí hay que recuperarlo antes de poder pulsar End.
 - Hay **un solo break por turno**, de 30 min. El exceso queda marcado en el panel web.
-- Reglas ajustables en `.env`: `SHIFT_HOURS` y `BREAK_MINUTES`.
+- Reglas generales en `.env`: `SHIFT_HOURS` y `BREAK_MINUTES`.
 - Un turno que quedó abierto se cierra desde el panel web, en Fichajes → En vivo.
 
 ## Cuentas y permisos
@@ -87,11 +89,15 @@ suelto; el canal normal de los chatters es Discord.
 
 La agencia trabaja en hora de Venezuela (`TIMEZONE=America/Caracas`) con tres turnos:
 
-| Turno | Entrada | Salida |
-|---|---|---|
-| Shift 1 | 05:30 | 13:00 |
-| Shift 2 | 13:00 | 21:15 |
-| Shift 3 | 21:15 | 05:30 |
+| Turno | Entrada | Salida | Duración |
+|---|---|---|---|
+| Shift 1 | 05:30 | 13:00 | 7 h 30 min |
+| Shift 2 | 13:00 | 21:15 | 8 h 15 min |
+| Shift 3 | 21:15 | 05:15 | 8 h |
+
+Cada turno tiene su propia duración: en Horarios se escribe la salida y la duración se
+calcula sola. El fichaje guarda la duración con la que empezó, así que cambiarla no afecta
+a quien ya está en turno.
 
 Nadie se configura uno por uno. Al pulsar **Start**, el bot decide el turno por este orden:
 

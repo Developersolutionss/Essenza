@@ -12,6 +12,12 @@ function breaksOf(shiftId) {
   return db.prepare("SELECT * FROM shift_breaks WHERE shift_id = ? ORDER BY started_at").all(shiftId);
 }
 
+// Duración exigida para pulsar End: la de su turno (guardada al iniciar) o, si no
+// tiene turno, la general de SHIFT_HOURS.
+function requiredOf(shift) {
+  return shift.required_minutes ? shift.required_minutes * 60000 : SHIFT_MS;
+}
+
 // Resume un turno. El break permitido (BREAK_MINUTES) es tiempo pagado y cuenta
 // como trabajado; solo el exceso se descuenta y hay que recuperarlo.
 function summarize(shift, breaks, now = Date.now()) {
@@ -24,14 +30,16 @@ function summarize(shift, breaks, now = Date.now()) {
   }
   const breakOverMs = Math.max(0, breakMs - BREAK_MS);
   const workedMs = Math.max(0, end - shift.started_at - breakOverMs);
+  const requiredMs = requiredOf(shift);
   return {
     workedMs,
+    requiredMs,
     breakMs,
     breakOverMs,
     onBreak: Boolean(openBreak),
     openBreakStartedAt: openBreak ? openBreak.started_at : null,
-    canEnd: !openBreak && workedMs >= SHIFT_MS,
-    remainingMs: Math.max(0, SHIFT_MS - workedMs),
+    canEnd: !openBreak && workedMs >= requiredMs,
+    remainingMs: Math.max(0, requiredMs - workedMs),
     breaks: breaks.map((b) => ({ startedAt: b.started_at, endedAt: b.ended_at })),
   };
 }
@@ -42,18 +50,28 @@ function statusOf(discordId, now = Date.now()) {
   return { shift, ...summarize(shift, breaksOf(shift.id), now) };
 }
 
-// `plan` (opcional) trae el turno con el que se medirá la puntualidad:
-// { templateName, expectedAt, graceMin }. Se guarda en el propio fichaje.
+// `plan` (opcional) trae el turno con el que se medirá la puntualidad y la duración
+// exigida: { templateName, expectedAt, graceMin, durationMin, source }. Se guarda en
+// el propio fichaje, así que cambiar un turno después no altera los ya iniciados.
 function startShift(discordId, name, now = Date.now(), plan = null) {
   const open = getOpenShift(discordId);
   if (open) return { ok: false, reason: "already_open", shift: open };
   try {
     const info = db
       .prepare(
-        `INSERT INTO shifts (discord_id, discord_name, started_at, template_name, expected_at, grace_minutes, plan_source)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO shifts (discord_id, discord_name, started_at, template_name, expected_at, grace_minutes, plan_source, required_minutes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .run(discordId, name, now, plan?.templateName ?? null, plan?.expectedAt ?? null, plan?.graceMin ?? null, plan?.source ?? null);
+      .run(
+        discordId,
+        name,
+        now,
+        plan?.templateName ?? null,
+        plan?.expectedAt ?? null,
+        plan?.graceMin ?? null,
+        plan?.source ?? null,
+        plan?.durationMin ?? null
+      );
     return { ok: true, shift: db.prepare("SELECT * FROM shifts WHERE id = ?").get(info.lastInsertRowid) };
   } catch {
     return { ok: false, reason: "already_open" };
@@ -82,7 +100,7 @@ function endShift(discordId, now = Date.now()) {
   const st = statusOf(discordId, now);
   if (!st) return { ok: false, reason: "no_shift" };
   if (st.onBreak) return { ok: false, reason: "on_break", st };
-  if (st.workedMs < SHIFT_MS) return { ok: false, reason: "too_early", st };
+  if (st.workedMs < st.requiredMs) return { ok: false, reason: "too_early", st };
   db.prepare("UPDATE shifts SET ended_at = ? WHERE id = ?").run(now, st.shift.id);
   const closed = db.prepare("SELECT * FROM shifts WHERE id = ?").get(st.shift.id);
   return { ok: true, shift: closed, ...summarize(closed, breaksOf(closed.id), now) };
