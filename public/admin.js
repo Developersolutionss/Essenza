@@ -253,15 +253,19 @@ const valueLabels = {
     const { ctx } = chart;
     ctx.save();
     ctx.fillStyle = COL.fg;
-    ctx.font = "12px 'Fira Code', monospace";
-    ctx.textBaseline = "middle";
-    ctx.textAlign = "left";
+    ctx.font = "600 12px 'Fira Code', monospace";
+    // Barras verticales: el valor va encima; horizontales: a la derecha.
+    const vertical = chart.options.indexAxis !== "y";
+    ctx.textBaseline = vertical ? "bottom" : "middle";
+    ctx.textAlign = vertical ? "center" : "left";
     chart.data.datasets.forEach((ds, i) => {
       const meta = chart.getDatasetMeta(i);
       if (meta.hidden) return;
       meta.data.forEach((bar, j) => {
         const v = ds.data[j];
-        if (v) ctx.fillText(nf.format(v), bar.x + 6, bar.y);
+        if (!v) return;
+        if (vertical) ctx.fillText(nf.format(v), bar.x, bar.y - 6);
+        else ctx.fillText(nf.format(v), bar.x + 6, bar.y);
       });
     });
     ctx.restore();
@@ -347,14 +351,20 @@ function dailyChart(id, daily) {
       data: {
         labels: daily.map((d) => shortDay(d.day)),
         datasets: [
-          { label: "Generado (consume créditos)", data: daily.map((d) => d.generated), backgroundColor: COL.cost, borderRadius: 3, stack: "a" },
-          { label: "Desde caché (gratis)", data: daily.map((d) => d.cached), backgroundColor: hatch(RGB.saved), borderColor: COL.saved, borderWidth: 1, borderRadius: 3, stack: "a" },
+          { label: "Generado (consume créditos)", data: daily.map((d) => d.generated), backgroundColor: COL.cost, borderRadius: 3, maxBarThickness: 34, stack: "a" },
+          { label: "Desde caché (gratis)", data: daily.map((d) => d.cached), backgroundColor: hatch(RGB.saved), borderColor: COL.saved, borderWidth: 1, borderRadius: 3, maxBarThickness: 34, stack: "a" },
         ],
       },
       options: baseOpts({
         scales: {
-          x: { stacked: true, grid: { display: false }, ticks: { maxRotation: 0, autoSkipPadding: 14 } },
-          y: { stacked: true, beginAtZero: true, ticks: { callback: (v) => nf.format(v) } },
+          x: { stacked: true, grid: { display: false }, border: { color: COL.grid }, ticks: { maxRotation: 0, autoSkipPadding: 14 } },
+          y: {
+            stacked: true,
+            beginAtZero: true,
+            border: { display: false },
+            grid: { color: COL.grid, drawTicks: false },
+            ticks: { maxTicksLimit: 5, padding: 8, callback: (v) => nf.format(v) },
+          },
         },
       }),
     },
@@ -362,18 +372,70 @@ function dailyChart(id, daily) {
   );
 }
 
-function hbar(id, label, labels, datasets, legend = false) {
+// Relleno con degradado vertical suave (de más claro abajo a pleno arriba).
+// Si el color no es un hex (por ejemplo una trama), se deja tal cual.
+function gradientFill(color) {
+  if (typeof color !== "string" || !/^#[0-9a-f]{6}$/i.test(color)) return color;
+  const rgb = hexToRgb(color);
+  return (ctx) => {
+    const { chart } = ctx;
+    const area = chart.chartArea;
+    if (!area) return color;
+    const g = chart.ctx.createLinearGradient(0, area.bottom, 0, area.top);
+    g.addColorStop(0, `rgba(${rgb},0.55)`);
+    g.addColorStop(1, `rgba(${rgb},1)`);
+    return g;
+  };
+}
+
+// Barras verticales: grosor máximo para que una sola barra no ocupe todo el ancho,
+// esquinas redondeadas arriba, valor encima y nombres recortados en el eje.
+function vbar(id, label, labels, datasets, legend = false) {
   mk(
     id,
     {
       type: "bar",
-      data: { labels, datasets: datasets.map((d) => ({ borderRadius: 4, ...d })) },
+      data: {
+        labels,
+        datasets: datasets.map((d) => ({
+          borderRadius: { topLeft: 6, topRight: 6 },
+          borderSkipped: "bottom",
+          maxBarThickness: 46,
+          categoryPercentage: 0.7,
+          barPercentage: 0.85,
+          ...d,
+          backgroundColor: gradientFill(d.backgroundColor),
+          hoverBackgroundColor: d.backgroundColor,
+        })),
+      },
       plugins: [valueLabels],
       options: baseOpts({
-        indexAxis: "y",
-        layout: { padding: { left: 8, right: 44 } },
-        scales: { x: { beginAtZero: true, ticks: { precision: 0, callback: (v) => nf.format(v) } }, y: { grid: { display: false }, ticks: { callback(v) { const l = String(this.getLabelForValue(v)); return l.length > 14 ? `${l.slice(0, 13)}…` : l; } } } },
-        plugins: { legend: { display: legend, position: "bottom", labels: { boxWidth: 14, boxHeight: 12, padding: 14 } }, valueLabels: { display: true } },
+        layout: { padding: { top: 22, left: 4, right: 4 } },
+        scales: {
+          x: {
+            grid: { display: false },
+            border: { color: COL.grid },
+            ticks: {
+              maxRotation: 0,
+              autoSkip: false,
+              callback(v) {
+                const l = String(this.getLabelForValue(v));
+                return l.length > 11 ? `${l.slice(0, 10)}…` : l;
+              },
+            },
+          },
+          y: {
+            beginAtZero: true,
+            border: { display: false },
+            grid: { color: COL.grid, drawTicks: false },
+            ticks: { precision: 0, maxTicksLimit: 5, padding: 8, callback: (v) => nf.format(v) },
+          },
+        },
+        plugins: {
+          legend: { display: legend, position: "bottom", labels: { boxWidth: 14, boxHeight: 12, padding: 14 } },
+          valueLabels: { display: true },
+          tooltip: { callbacks: { title: (items) => items[0]?.label || "" } },
+        },
       }),
     },
     label
@@ -636,7 +698,7 @@ views.fichajes = {
       after() {
         const top = d.people.filter((p) => p.lateCount || p.overCount).slice(0, 10);
         if (!top.length) return;
-        hbar("c-people", "Incidencias por persona: llegadas tarde y excesos de break", top.map((p) => p.name), [
+        vbar("c-people", "Incidencias por persona: llegadas tarde y excesos de break", top.map((p) => p.name), [
           { label: "Llegadas tarde", data: top.map((p) => p.lateCount), backgroundColor: COL.danger },
           { label: "Excesos de break", data: top.map((p) => p.overCount), backgroundColor: hatch(RGB.cost), borderColor: COL.cost, borderWidth: 1 },
         ], true);
@@ -775,9 +837,9 @@ views.elevenlabs = {
         }, "Créditos acumulados del mes con proyección a fin de mes");
 
         const used = d.voices.filter((v) => v.chars > 0).slice(0, 10);
-        if (used.length) hbar("c-voices", "Créditos gastados por voz", used.map((v) => v.name), [{ label: "Créditos", data: used.map((v) => v.chars), backgroundColor: COL.cost }]);
+        if (used.length) vbar("c-voices", "Créditos gastados por voz", used.map((v) => v.name), [{ label: "Créditos", data: used.map((v) => v.chars), backgroundColor: COL.cost }]);
         const ch = d.chatters.filter((c) => c.chars > 0).slice(0, 10);
-        if (ch.length) hbar("c-chat", "Créditos gastados por chatter", ch.map((c) => c.name), [{ label: "Créditos", data: ch.map((c) => c.chars), backgroundColor: COL.info }]);
+        if (ch.length) vbar("c-chat", "Créditos gastados por chatter", ch.map((c) => c.name), [{ label: "Créditos", data: ch.map((c) => c.chars), backgroundColor: COL.cost }]);
       },
     };
   },
