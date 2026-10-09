@@ -6,6 +6,7 @@ const {
   MessageFlags,
 } = require("discord.js");
 const shifts = require("./shifts");
+const plans = require("./shiftPlan");
 
 const ts = (ms, style = "t") => `<t:${Math.floor(ms / 1000)}:${style}>`;
 
@@ -85,16 +86,30 @@ function statusText(st) {
   );
 }
 
-function runAction(action, discordId, name) {
+function runAction(action, discordId, name, roleNames = []) {
   switch (action) {
     case "start": {
-      const r = shifts.startShift(discordId, name);
+      const now = Date.now();
+      const plan = plans.resolveForStart({ discordId, roleNames, startedAt: now });
+      const r = shifts.startShift(discordId, name, now, plan);
       if (!r.ok) return `❌ Ya tienes un turno abierto desde ${ts(r.shift?.started_at ?? Date.now())}.`;
-      return (
+
+      let msg =
         `✅ Turno iniciado a las ${ts(r.shift.started_at)}.\n` +
         `Podrás pulsar **End** cuando acumules ${fmt(shifts.SHIFT_MS)} de trabajo (sin contar breaks), ` +
-        `aprox. ${ts(r.shift.started_at + shifts.SHIFT_MS)}.`
-      );
+        `aprox. ${ts(r.shift.started_at + shifts.SHIFT_MS)}.`;
+
+      if (plan) {
+        const quien = plan.templateName ? `**${plan.templateName}**` : "tu horario personal";
+        const lateMs = Math.max(0, r.shift.started_at - plan.expectedAt);
+        msg += `\n📋 Turno: ${quien}, entrada a las ${plan.startTime} (${plans.tzLabel()}). `;
+        msg += lateMs > plan.graceMin * 60000
+          ? `⚠️ Llegaste **${fmt(lateMs)}** tarde.`
+          : "Llegaste a tiempo.";
+      } else {
+        msg += "\nℹ️ No detecté tu turno: necesitas un rol de Discord que contenga Shift 1, Shift 2 o Shift 3. Hoy no se mide tu puntualidad.";
+      }
+      return msg;
     }
     case "break": {
       const r = shifts.startBreak(discordId);
@@ -144,7 +159,11 @@ function runAction(action, discordId, name) {
 async function handleShiftButton(interaction) {
   const action = interaction.customId.split(":")[1];
   const name = interaction.member?.displayName || interaction.user.globalName || interaction.user.username;
-  const text = runAction(action, interaction.user.id, name);
+  // Nombres de los roles de Discord de la persona: de ahí sale su turno.
+  const roleNames = interaction.member?.roles?.cache
+    ? [...interaction.member.roles.cache.values()].map((r) => r.name)
+    : [];
+  const text = runAction(action, interaction.user.id, name, roleNames);
 
   // La acción ya quedó guardada en la base: pase lo que pase con el panel del
   // canal, la persona tiene que recibir su confirmación.

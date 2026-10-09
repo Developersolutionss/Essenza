@@ -40,13 +40,18 @@ function statusOf(discordId, now = Date.now()) {
   return { shift, ...summarize(shift, breaksOf(shift.id), now) };
 }
 
-function startShift(discordId, name, now = Date.now()) {
+// `plan` (opcional) trae el turno con el que se medirá la puntualidad:
+// { templateName, expectedAt, graceMin }. Se guarda en el propio fichaje.
+function startShift(discordId, name, now = Date.now(), plan = null) {
   const open = getOpenShift(discordId);
   if (open) return { ok: false, reason: "already_open", shift: open };
   try {
     const info = db
-      .prepare("INSERT INTO shifts (discord_id, discord_name, started_at) VALUES (?, ?, ?)")
-      .run(discordId, name, now);
+      .prepare(
+        `INSERT INTO shifts (discord_id, discord_name, started_at, template_name, expected_at, grace_minutes)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      )
+      .run(discordId, name, now, plan?.templateName ?? null, plan?.expectedAt ?? null, plan?.graceMin ?? null);
     return { ok: true, shift: db.prepare("SELECT * FROM shifts WHERE id = ?").get(info.lastInsertRowid) };
   } catch {
     return { ok: false, reason: "already_open" };

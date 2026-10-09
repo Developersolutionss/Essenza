@@ -72,11 +72,38 @@ quedar al menos un administrador activo.
 - **Resumen**: quién está en turno, alertas y consumo del día.
 - **Fichajes**: llegadas tarde, excesos de break, historial y cierre de turnos abiertos.
 - **ElevenLabs**: créditos del plan, consumo diario, proyección del mes, voces más usadas y ahorro por caché.
-- **Horarios**: hora de entrada esperada y minutos de gracia por persona. Sin horario, nadie se marca como tarde.
+- **Horarios**: los turnos fijos y sus horas de entrada, más excepciones por persona (ver abajo).
 - **Cuentas**: quién entra al panel y con qué rol.
 
 La web de chatters (`/`) usa las mismas cuentas y sirve para generar un audio
 suelto; el canal normal de los chatters es Discord.
+
+## Turnos y puntualidad
+
+La agencia trabaja en hora de Venezuela (`TIMEZONE=America/Caracas`) con tres turnos
+de 8 horas:
+
+| Turno | Entrada | Salida |
+|---|---|---|
+| Shift 1 | 05:00 | 13:00 |
+| Shift 2 | 13:00 | 21:00 |
+| Shift 3 | 21:00 | 05:00 |
+
+Nadie se configura uno por uno. Al pulsar **Start**, el bot mira los roles de Discord
+de la persona: si alguno **contiene** el nombre de un turno (por ejemplo `Shift 2 (Chatter)`
+contiene `Shift 2`), se le aplica la hora de entrada de ese turno y el bot le dice
+si llegó a tiempo o tarde. Para cambiar a alguien de turno basta con cambiarle el rol.
+
+- La hora esperada se guarda en el propio fichaje: cambiar un turno o el rol de alguien
+  no reescribe el historial.
+- Los **minutos de gracia** (10 por defecto) se ajustan por turno.
+- Quien no tenga un rol de turno no se mide en puntualidad, pero su turno, su break y sus
+  horas se registran igual. El panel avisa de cuántas personas están en ese caso.
+- Un **horario personal** (Horarios, Excepciones) tiene prioridad sobre el turno del rol.
+  Sirve para quien no sigue su turno.
+- El turno nocturno cruza la medianoche: quien ficha a las 00:30 en Shift 3 llegó
+  3 h 30 min tarde.
+- Los turnos se crean, editan y borran desde Horarios (solo administradores).
 
 ## Costos y límites
 

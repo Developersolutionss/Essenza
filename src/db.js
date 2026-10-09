@@ -126,6 +126,32 @@ db.exec(`
   );
 `);
 
+// Turnos fijos (Shift 1, 2, 3...). Cada persona se asigna sola por su rol de Discord.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS shift_templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    start_time TEXT NOT NULL,           -- 'HH:MM' en la zona TIMEZONE
+    grace_minutes INTEGER NOT NULL DEFAULT 10
+  );
+`);
+
+// Los fichajes guardan la hora esperada y el turno con el que se midieron, para
+// que cambiar un turno o el rol de alguien no reescriba el historial.
+const shiftCols = db.prepare("PRAGMA table_info(shifts)").all().map((c) => c.name);
+if (!shiftCols.includes("template_name")) db.exec("ALTER TABLE shifts ADD COLUMN template_name TEXT;");
+if (!shiftCols.includes("expected_at")) db.exec("ALTER TABLE shifts ADD COLUMN expected_at INTEGER;");
+if (!shiftCols.includes("grace_minutes")) db.exec("ALTER TABLE shifts ADD COLUMN grace_minutes INTEGER;");
+
+// Turnos de la agencia, en hora de Venezuela: 8 horas cada uno.
+if (db.prepare("SELECT COUNT(*) AS n FROM shift_templates").get().n === 0) {
+  const grace = Number(process.env.LATE_GRACE_MINUTES || 10);
+  const ins = db.prepare("INSERT INTO shift_templates (name, start_time, grace_minutes) VALUES (?, ?, ?)");
+  ins.run("Shift 1", "05:00", grace);
+  ins.run("Shift 2", "13:00", grace);
+  ins.run("Shift 3", "21:00", grace);
+}
+
 // Migración: vincular cada chatter con su usuario de Discord.
 const chatterCols = db.prepare("PRAGMA table_info(chatters)").all();
 if (!chatterCols.some((c) => c.name === "discord_id")) {

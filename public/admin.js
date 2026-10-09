@@ -449,13 +449,14 @@ views.fichajes = {
   render(d) {
     const k = d.kpis;
     const noSched = k.unscheduled
-      ? `<div class="note section">${ic("info")}<span>${k.unscheduled} persona(s) sin horario: no se puede saber si llegaron tarde.</span><a href="#horarios">Configurar horarios</a></div>`
+      ? `<div class="note section">${ic("info")}<span>${k.unscheduled} persona(s) sin turno detectado: no tienen un rol Shift ni un horario personal, así que no se mide su puntualidad.</span>${state.user?.role === "admin" ? '<a href="#horarios">Ver turnos</a>' : ""}</div>`
       : "";
 
     const lateTbl = d.late.length
-      ? table("late", "Llegadas tarde", [{ h: "Persona", sort: "text" }, { h: "Día", sort: "num" }, { h: "Esperado" }, { h: "Llegó" }, { h: "Retraso", num: true, sort: "num" }],
+      ? table("late", "Llegadas tarde", [{ h: "Persona", sort: "text" }, { h: "Turno", sort: "text" }, { h: "Día", sort: "num" }, { h: "Esperado" }, { h: "Llegó" }, { h: "Retraso", num: true, sort: "num" }],
           d.late.map((s) => [
             `<span class="who">${esc(s.name)}</span>`,
+            { h: s.templateName ? esc(s.templateName) : `<span class="dim">${s.scheduleStart ? "Personal" : "—"}</span>`, v: s.templateName || "" },
             { h: `<span class="dim">${fmtDay(s.startedAt)}</span>`, v: s.startedAt },
             `<span class="mono">${fmtTime(s.expectedAt)}</span>`,
             `<span class="mono">${fmtTime(s.startedAt)}</span>`,
@@ -781,16 +782,36 @@ views.cuentas = {
   },
 };
 
-/* Horarios */
+/* Horarios: turnos fijos por rol de Discord + excepciones por persona */
 views.horarios = {
   url: () => "/api/admin/schedules",
   render(d) {
+    const tplRows = d.templates.map((t) => {
+      const tid = esc(t.id);
+      return [
+        `<label class="sr-only" for="tn-${tid}">Nombre del turno</label>
+         <input id="tn-${tid}" class="f-tname" value="${esc(t.name)}" maxlength="40" style="width:160px" autocomplete="off" />`,
+        `<label class="sr-only" for="ts-${tid}">Hora de entrada de ${esc(t.name)} (24 horas)</label>
+         <input id="ts-${tid}" class="mono f-tstart" type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" value="${esc(t.startTime)}" style="width:96px" autocomplete="off" />`,
+        `<label class="sr-only" for="tg-${tid}">Minutos de gracia de ${esc(t.name)}</label>
+         <input id="tg-${tid}" class="mono narrow f-tgrace" type="number" min="0" max="240" value="${esc(t.graceMin)}" />`,
+        `<div class="row-actions" data-tpl="${tid}" data-name="${esc(t.name)}">
+           <button type="button" class="btn sm primary act-tsave" data-key="tsave-${tid}">Guardar</button>
+           <button type="button" class="btn sm danger act-tdel" data-key="tdel-${tid}">${ic("trash")}Borrar</button>
+         </div><span class="row-msg" role="alert"></span>`,
+      ];
+    });
+    const tplTbl = d.templates.length
+      ? table("tpl", "Turnos fijos", [{ h: "Turno" }, { h: "Entrada (24 h)" }, { h: "Gracia (min)" }, { h: "" }], tplRows)
+      : empty("No hay turnos. Crea el primero con el formulario de abajo.");
+
     const rows = d.people.map((p) => {
       const sid = esc(p.discordId);
       return [
         { h: `<span class="who">${esc(p.name)}</span>`, v: p.name },
         `<span class="dim mono">${sid}</span>`,
-        `<label class="sr-only" for="start-${sid}">Hora de entrada de ${esc(p.name)} (24 horas)</label>
+        { h: p.lastTemplate ? pill("", null, p.lastTemplate) : '<span class="dim">sin detectar</span>', v: p.lastTemplate || "" },
+        `<label class="sr-only" for="start-${sid}">Horario personal de ${esc(p.name)} (24 horas)</label>
          <input id="start-${sid}" class="mono f-start" type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" value="${esc(p.start || "")}" style="width:96px" autocomplete="off" />`,
         `<label class="sr-only" for="grace-${sid}">Minutos de gracia de ${esc(p.name)}</label>
          <input id="grace-${sid}" class="mono narrow f-grace" type="number" min="0" max="240" value="${p.graceMin ?? d.defaultGrace}" />`,
@@ -801,15 +822,31 @@ views.horarios = {
       ];
     });
     const tbl = d.people.length
-      ? table("sched", "Horarios por persona", [{ h: "Persona", sort: "text" }, { h: "Discord ID" }, { h: "Entrada (24 h)" }, { h: "Gracia (min)" }, { h: "" }], rows)
-      : empty("Todavía nadie ha fichado. Agrega a alguien con el formulario de abajo.");
+      ? table("sched", "Excepciones por persona", [{ h: "Persona", sort: "text" }, { h: "Discord ID" }, { h: "Turno detectado", sort: "text" }, { h: "Horario personal" }, { h: "Gracia (min)" }, { h: "" }], rows)
+      : empty("Todavía nadie ha fichado.");
 
     const html = `
-      ${head("Horarios", `Hora de entrada esperada · zona horaria <b class="mono">${esc(d.tz)}</b>`)}
-      <section class="panel section" aria-labelledby="h-sch"><div class="head"><h2 id="h-sch">Personas</h2></div>
-        <p class="sub">Con un horario, el panel marca como tarde a quien fiche después de la hora más los minutos de gracia. Aparecen quienes ya han usado Start.</p>
+      ${head("Horarios", `Hora de entrada esperada · ${esc(d.tzLabel)} (<b class="mono">${esc(d.tz)}</b>)`)}
+
+      <div class="note section">${ic("info")}<span>Cada persona se asigna sola al pulsar <b>Start</b>, según su rol de Discord: el rol debe <b>contener el nombre del turno</b>. Por ejemplo, el rol <b>Shift 2 (Chatter)</b> pertenece al turno <b>Shift 2</b>. No hay que configurar a nadie uno por uno.</span></div>
+
+      <section class="panel section" aria-labelledby="h-tpl"><div class="head"><h2 id="h-tpl">Turnos</h2></div>
+        <p class="sub">Hora de entrada de cada turno. Se mide la puntualidad frente a esta hora, más los minutos de gracia. Cambiar un turno no modifica los fichajes ya hechos.</p>
+        ${tplTbl}</section>
+
+      <section class="panel section" aria-labelledby="h-newtpl"><div class="head"><h2 id="h-newtpl">Agregar turno</h2></div>
+        <form id="tplForm" class="row-form" novalidate>
+          <div class="field"><label for="tp-name">Nombre</label><input id="tp-name" name="tplName" maxlength="40" autocomplete="off" aria-describedby="err-tplName" /><p class="field-error" id="err-tplName" role="alert"></p></div>
+          <div class="field"><label for="tp-start">Entrada (24 h)</label><input id="tp-start" name="tplStart" class="mono" style="width:120px" inputmode="numeric" maxlength="5" placeholder="HH:MM" autocomplete="off" aria-describedby="err-tplStart" /><p class="field-error" id="err-tplStart" role="alert"></p></div>
+          <div class="field"><label for="tp-grace">Gracia (min)</label><input id="tp-grace" name="tplGrace" class="mono narrow" type="number" min="0" max="240" value="${d.defaultGrace}" aria-describedby="err-tplGrace" /><p class="field-error" id="err-tplGrace" role="alert"></p></div>
+          <button class="btn primary" type="submit">${ic("plus")}Agregar turno</button>
+        </form></section>
+
+      <section class="panel section" aria-labelledby="h-sch"><div class="head"><h2 id="h-sch">Excepciones por persona</h2></div>
+        <p class="sub">Solo para quien no sigue su turno. Un horario personal tiene prioridad sobre el turno del rol. Aparecen quienes ya han usado Start.</p>
         ${tbl}</section>
-      <section class="panel" aria-labelledby="h-add"><div class="head"><h2 id="h-add">Agregar persona</h2></div>
+
+      <section class="panel" aria-labelledby="h-add"><div class="head"><h2 id="h-add">Agregar excepción</h2></div>
         <p class="sub">Para alguien que aún no ha fichado. En Discord, con el modo desarrollador activo: clic derecho sobre el usuario y Copiar ID.</p>
         <form id="addForm" class="row-form" novalidate>
           <div class="field"><label for="f-name">Nombre</label><input id="f-name" name="name" maxlength="80" autocomplete="off" aria-describedby="err-name" /><p class="field-error" id="err-name" role="alert"></p></div>
@@ -829,6 +866,9 @@ function normalizeTime(v) {
   return m ? `${m[1].padStart(2, "0")}:${m[2]}` : v.trim();
 }
 const RULES = {
+  tplName: (v) => (v.trim() ? (v.trim().length <= 40 ? "" : "Máximo 40 caracteres.") : "Escribe el nombre del turno."),
+  tplStart: (v) => (/^([01]\d|2[0-3]):[0-5]\d$/.test(normalizeTime(v)) ? "" : "Usa el formato de 24 horas, por ejemplo 05:00."),
+  tplGrace: (v) => (Number.isInteger(Number(v)) && v !== "" && Number(v) >= 0 && Number(v) <= 240 ? "" : "Un número entre 0 y 240."),
   displayName: (v) => (v.trim() ? "" : "Escribe el nombre de la persona."),
   username: (v) => (/^[a-zA-Z0-9._-]{3,32}$/.test(v.trim()) ? "" : "Entre 3 y 32 caracteres: letras, números, punto, guion o guion bajo."),
   password: (v) => (v.length >= 10 ? "" : "Al menos 10 caracteres."),
@@ -1075,6 +1115,45 @@ $("#view").addEventListener("click", async (e) => {
   const actions = e.target.closest(".row-actions");
   if (!actions) return;
 
+  // Turnos fijos (Shift 1, 2, 3...).
+  if (actions.dataset.tpl) {
+    const tid = actions.dataset.tpl;
+    const tname = actions.dataset.name;
+    const row = actions.closest("tr");
+    const msg = $(".row-msg", row);
+    msg.textContent = "";
+    try {
+      if (e.target.closest(".act-tsave")) {
+        const nameIn = $(".f-tname", row);
+        const startIn = $(".f-tstart", row);
+        const graceIn = $(".f-tgrace", row);
+        startIn.value = normalizeTime(startIn.value);
+        const err = RULES.tplName(nameIn.value) || RULES.tplStart(startIn.value) || RULES.tplGrace(graceIn.value);
+        if (err) {
+          msg.textContent = err;
+          return (RULES.tplName(nameIn.value) ? nameIn : RULES.tplStart(startIn.value) ? startIn : graceIn).focus();
+        }
+        const res = await api(`/api/admin/templates/${tid}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: nameIn.value.trim(), startTime: startIn.value, graceMin: Number(graceIn.value) }),
+        });
+        if (!res.ok) return (msg.textContent = (await res.json().catch(() => ({}))).error || "No se pudo guardar.");
+        toast(`Turno ${nameIn.value.trim()} guardado`);
+        load({ silent: true });
+      } else if (e.target.closest(".act-tdel")) {
+        if (!window.confirm(`¿Borrar el turno ${tname}? Quien tenga ese rol dejará de medirse en puntualidad. Los fichajes ya hechos no cambian.`)) return;
+        await api(`/api/admin/templates/${tid}`, { method: "DELETE" });
+        toast(`Turno ${tname} borrado`);
+        load({ silent: true });
+      }
+    } catch (err) {
+      if (err.message !== "auth") toast(err.message, true);
+    }
+    return;
+  }
+
+
   // Cuentas del panel.
   if (actions.dataset.user) {
     const id = actions.dataset.user;
@@ -1218,12 +1297,37 @@ $("#view").addEventListener("click", async (e) => {
 /* Validación al salir del campo y al enviar. */
 $("#view").addEventListener("focusout", (e) => {
   const input = e.target;
-  if (!input.form || !input.form.matches("#addForm, #userForm, #passForm") || !RULES[input.name]) return;
-  if (input.name === "start") input.value = normalizeTime(input.value);
+  if (!input.form || !input.form.matches("#addForm, #userForm, #passForm, #tplForm") || !RULES[input.name]) return;
+  if (input.name === "start" || input.name === "tplStart") input.value = normalizeTime(input.value);
   if (input.value !== "" || input.getAttribute("aria-invalid") === "true") setError(input, RULES[input.name](input.value));
 });
 
 $("#view").addEventListener("submit", async (e) => {
+  // Agregar un turno fijo.
+  if (e.target.matches("#tplForm")) {
+    e.preventDefault();
+    const f = e.target;
+    f.elements.tplStart.value = normalizeTime(f.elements.tplStart.value);
+    let bad = null;
+    for (const n of ["tplName", "tplStart", "tplGrace"]) {
+      if (setError(f.elements[n], RULES[n](f.elements[n].value)) && !bad) bad = f.elements[n];
+    }
+    if (bad) return bad.focus();
+    const res = await api("/api/admin/templates", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: f.elements.tplName.value.trim(),
+        startTime: f.elements.tplStart.value,
+        graceMin: Number(f.elements.tplGrace.value),
+      }),
+    });
+    if (!res.ok) return toast((await res.json().catch(() => ({}))).error || "No se pudo agregar el turno.", true);
+    toast(`Turno ${f.elements.tplName.value.trim()} agregado`);
+    load({ silent: true });
+    return;
+  }
+
   // Crear una cuenta nueva del panel.
   if (e.target.matches("#userForm")) {
     e.preventDefault();

@@ -149,7 +149,7 @@ input.mono { font-family: var(--font-data); }
 .pill.bad { color: var(--danger-text); border-color: rgba(248, 113, 113, 0.55); background: var(--danger-soft); }
 
 /* ---------- Tablas ---------- */
-.tbl-wrap { overflow: auto; border-radius: var(--radius-sm); }
+.tbl-wrap { position: relative; overflow: auto; border-radius: var(--radius-sm); } /* position: contiene las etiquetas .sr-only de las celdas, que si no ensanchan la página */
 .tbl-wrap.scroll { max-height: 440px; }
 .tbl-wrap:focus-visible { outline-offset: -2px; }
 table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
@@ -177,7 +177,8 @@ th[aria-sort="descending"] .th-btn .ic { transform: rotate(180deg); }
 .empty .ic { color: var(--fg-muted); }
 .empty.ok .ic { color: var(--accent); }
 .note { display: flex; gap: var(--sp-3); align-items: center; flex-wrap: wrap; padding: var(--sp-3) var(--sp-4); border-radius: var(--radius-sm); background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(251, 191, 36, 0.4); color: var(--fg-2); }
-.note .ic { color: var(--warn-text); }
+.note .ic { color: var(--warn-text); flex: none; }
+.note > span { flex: 1 1 260px; min-width: 0; }
 .note a { color: var(--warn-text); font-weight: 600; }
 
 .toasts { position: fixed; right: var(--sp-4); bottom: var(--sp-4); z-index: 50; display: grid; gap: var(--sp-2); max-width: min(92vw, 420px); }

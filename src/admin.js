@@ -4,6 +4,7 @@ const shifts = require("./shifts");
 const auth = require("./auth");
 const users = require("./users");
 const tzu = require("./timezone");
+const plans = require("./shiftPlan");
 
 const router = express.Router();
 const DAY = 86400000;
@@ -141,19 +142,34 @@ function dailySeries(since, now) {
 
 
 // Turnos enriquecidos con horario (llegada tarde) y breaks.
+// Turnos enriquecidos con la hora esperada. Primero se usa lo guardado en el
+// propio fichaje (turno por rol u horario personal vigente al fichar); en
+// fichajes antiguos sin ese dato se usa el horario personal actual.
 function enrichShifts(list) {
   const sched = new Map(db.prepare("SELECT * FROM schedules").all().map((s) => [s.discord_id, s]));
   const tz = tzu.getTz();
+  const defaultGrace = plans.DEFAULT_GRACE();
   return list.map((o) => {
-    const sc = sched.get(o.shift.discord_id);
     let expectedAt = null;
-    let lateMs = 0;
-    let late = false;
-    if (sc) {
+    let graceMin = null;
+    let templateName = null;
+    let scheduleStart = null;
+    const sc = sched.get(o.shift.discord_id);
+
+    if (o.shift.expected_at != null) {
+      expectedAt = o.shift.expected_at;
+      graceMin = o.shift.grace_minutes ?? defaultGrace;
+      templateName = o.shift.template_name;
+    } else if (sc) {
       expectedAt = tzu.expectedStart(o.shift.started_at, sc.start_time, tz);
-      lateMs = Math.max(0, o.shift.started_at - expectedAt);
-      late = lateMs > sc.grace_minutes * 60000;
+      graceMin = sc.grace_minutes;
+      scheduleStart = sc.start_time;
     }
+
+    const scheduled = expectedAt != null;
+    const lateMs = scheduled ? Math.max(0, o.shift.started_at - expectedAt) : 0;
+    const late = scheduled && lateMs > graceMin * 60000;
+
     return {
       id: o.shift.id,
       discordId: o.shift.discord_id,
@@ -166,9 +182,10 @@ function enrichShifts(list) {
       onBreak: o.onBreak,
       openBreakStartedAt: o.openBreakStartedAt,
       breaks: o.breaks,
-      scheduled: Boolean(sc),
-      scheduleStart: sc?.start_time || null,
-      graceMin: sc?.grace_minutes ?? null,
+      scheduled,
+      templateName,
+      scheduleStart,
+      graceMin,
       expectedAt,
       lateMs,
       late,
@@ -448,25 +465,28 @@ router.get("/elevenlabs", requireAuth, async (req, res) => {
 router.get("/schedules", requireAuth, (req, res) => {
   const known = db
     .prepare(
-      `SELECT discord_id, discord_name FROM shifts WHERE id IN (SELECT MAX(id) FROM shifts GROUP BY discord_id)`
+      `SELECT discord_id, discord_name, template_name FROM shifts WHERE id IN (SELECT MAX(id) FROM shifts GROUP BY discord_id)`
     )
     .all();
   const sched = new Map(db.prepare("SELECT * FROM schedules").all().map((s) => [s.discord_id, s]));
   const ids = new Set([...known.map((k) => k.discord_id), ...sched.keys()]);
-  const nameOf = new Map(known.map((k) => [k.discord_id, k.discord_name]));
+  const byId = new Map(known.map((k) => [k.discord_id, k]));
 
   const people = [...ids]
     .map((id) => ({
       discordId: id,
-      name: sched.get(id)?.display_name || nameOf.get(id) || id,
+      name: sched.get(id)?.display_name || byId.get(id)?.discord_name || id,
       start: sched.get(id)?.start_time || null,
       graceMin: sched.get(id)?.grace_minutes ?? null,
+      lastTemplate: byId.get(id)?.template_name || null,
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   res.json({
     tz: tzu.getTz(),
-    defaultGrace: Number(process.env.LATE_GRACE_MINUTES || 10),
+    tzLabel: plans.tzLabel(),
+    defaultGrace: plans.DEFAULT_GRACE(),
+    templates: plans.listTemplates(),
     people,
   });
 });
@@ -497,6 +517,51 @@ router.put("/schedules/:discordId", requireAdmin, (req, res) => {
 
 router.delete("/schedules/:discordId", requireAdmin, (req, res) => {
   db.prepare("DELETE FROM schedules WHERE discord_id = ?").run(String(req.params.discordId));
+  res.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// Turnos fijos (Shift 1, 2, 3...): solo administradores
+// ---------------------------------------------------------------------------
+
+function checkTemplate({ name, startTime, graceMin }) {
+  if (!String(name || "").trim()) return "Escribe el nombre del turno.";
+  if (String(name).trim().length > 40) return "El nombre del turno es demasiado largo.";
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(String(startTime || ""))) return "La hora debe ser HH:MM, en 24 horas.";
+  const g = Number(graceMin);
+  if (!Number.isInteger(g) || g < 0 || g > 240) return "La gracia debe ser un número entre 0 y 240 minutos.";
+  return "";
+}
+
+router.post("/templates", requireAdmin, (req, res) => {
+  const bad = checkTemplate(req.body || {});
+  if (bad) return res.status(400).json({ error: bad });
+  const name = String(req.body.name).trim();
+  if (db.prepare("SELECT 1 FROM shift_templates WHERE name = ?").get(name)) {
+    return res.status(409).json({ error: "Ya existe un turno con ese nombre." });
+  }
+  db.prepare("INSERT INTO shift_templates (name, start_time, grace_minutes) VALUES (?, ?, ?)")
+    .run(name, req.body.startTime, Number(req.body.graceMin));
+  res.status(201).json({ ok: true });
+});
+
+router.put("/templates/:id", requireAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  if (!db.prepare("SELECT 1 FROM shift_templates WHERE id = ?").get(id)) {
+    return res.status(404).json({ error: "Turno no encontrado" });
+  }
+  const bad = checkTemplate(req.body || {});
+  if (bad) return res.status(400).json({ error: bad });
+  const name = String(req.body.name).trim();
+  const clash = db.prepare("SELECT id FROM shift_templates WHERE name = ? AND id != ?").get(name, id);
+  if (clash) return res.status(409).json({ error: "Ya existe un turno con ese nombre." });
+  db.prepare("UPDATE shift_templates SET name = ?, start_time = ?, grace_minutes = ? WHERE id = ?")
+    .run(name, req.body.startTime, Number(req.body.graceMin), id);
+  res.json({ ok: true });
+});
+
+router.delete("/templates/:id", requireAdmin, (req, res) => {
+  db.prepare("DELETE FROM shift_templates WHERE id = ?").run(Number(req.params.id));
   res.json({ ok: true });
 });
 
