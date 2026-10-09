@@ -73,6 +73,28 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_cache_lookup ON audio_cache(model_id, text_hash);
 `);
 
+// Cuentas del panel. Las contraseñas se guardan cifradas con scrypt (sal por
+// usuario), nunca en claro. Roles: "admin" (todo) y "manager" (ve el panel y
+// cierra turnos, pero no toca cuentas ni horarios).
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    display_name TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    password_salt TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'manager',
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    last_login_at TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+`);
+
 // Fichajes: turnos y breaks (tiempos en milisegundos epoch).
 db.exec(`
   CREATE TABLE IF NOT EXISTS shifts (

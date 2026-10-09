@@ -1,50 +1,42 @@
 const express = require("express");
 const db = require("./db");
 const tzu = require("./timezone");
-const { createAuth } = require("./auth");
+const auth = require("./auth");
 const { generateAudio, GenerationError } = require("./generator");
 
 const router = express.Router();
 
-// La web de chatters también pide contraseña: expuesta en un VPS, /generate
-// gasta créditos de ElevenLabs con solo escribir un chatter_id.
-// Sin CHATTER_PASSWORD en el entorno, la web queda desactivada y solo funciona
-// el bot de Discord.
-const chatterAuth = createAuth({
-  cookieName: "essensa_chatter",
-  secretEnv: "CHATTER_PASSWORD",
-  label: "Acceso de chatters",
-});
-const adminAuth = createAuth({
-  cookieName: "essensa_admin",
-  secretEnv: "ADMIN_PASSWORD",
-  label: "Panel",
-});
+// La web la usan las mismas cuentas del panel. Generar audio gasta créditos de
+// ElevenLabs, así que exige sesión; el canal normal de los chatters es Discord.
 
-router.post("/login", (req, res) => chatterAuth.login(req, res));
-router.post("/logout", (req, res) => chatterAuth.logout(req, res));
-router.get("/session", (req, res) =>
-  res.json({ enabled: chatterAuth.enabled(), authenticated: chatterAuth.check(req) })
-);
-
+router.get("/session", (req, res) => {
+  const user = auth.currentUser(req);
+  res.json({ authenticated: Boolean(user), user: user || null });
+});
 // ---- Modelos ----
 
-router.get("/models", chatterAuth.require, (req, res) => {
+router.get("/models", auth.requireAuth, (req, res) => {
   const models = db
     .prepare("SELECT id, name, provider FROM models WHERE active = 1 ORDER BY name")
     .all();
   res.json(models);
 });
 
+// ---- Chatters (para elegir a quién se le anota el consumo) ----
+
+router.get("/chatters", auth.requireAuth, (req, res) => {
+  res.json(db.prepare("SELECT id, name FROM chatters WHERE active = 1 ORDER BY name").all());
+});
+
 // ---- Frases pre-armadas ----
 
-router.get("/phrases", chatterAuth.require, (req, res) => {
+router.get("/phrases", auth.requireAuth, (req, res) => {
   const phrases = db.prepare("SELECT id, label, text FROM phrases ORDER BY label").all();
   res.json(phrases);
 });
 
-// Crear frases es cosa de managers: las frases las disparan luego los chatters.
-router.post("/phrases", adminAuth.require, (req, res) => {
+// Crear frases es trabajo operativo: también lo hacen los managers.
+router.post("/phrases", auth.requireAuth, (req, res) => {
   const label = String(req.body?.label || "").trim();
   const text = String(req.body?.text || "").trim();
   if (!label || !text) return res.status(400).json({ error: "label y text son requeridos" });
@@ -56,7 +48,7 @@ router.post("/phrases", adminAuth.require, (req, res) => {
 
 // ---- Generación de audio ----
 
-router.post("/generate", chatterAuth.require, async (req, res) => {
+router.post("/generate", auth.requireAuth, async (req, res) => {
   const { chatter_id, model_id, text } = req.body || {};
   try {
     const { buffer, source } = await generateAudio({
@@ -79,7 +71,7 @@ router.post("/generate", chatterAuth.require, async (req, res) => {
 
 // ---- Resumen de uso (solo managers) ----
 
-router.get("/usage/summary", adminAuth.require, (req, res) => {
+router.get("/usage/summary", auth.requireAuth, (req, res) => {
   const dayStart = tzu.sqlTime(tzu.startOfLocalDay(Date.now()));
   const monthStart = tzu.sqlTime(tzu.startOfLocalMonth(Date.now()));
 

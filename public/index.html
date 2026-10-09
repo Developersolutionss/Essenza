@@ -22,19 +22,16 @@
       <div class="brand"><span class="mark" aria-hidden="true"></span>Essensa</div>
       <h1 id="login-title" class="login-title">Generador de audios</h1>
       <div class="field">
+        <label for="username">Usuario</label>
+        <input id="username" name="username" autocomplete="username" required />
+      </div>
+      <div class="field">
         <label for="password">Contraseña</label>
         <input id="password" type="password" autocomplete="current-password" required aria-describedby="loginError" />
         <p id="loginError" class="field-error" role="alert"></p>
       </div>
       <button type="submit" class="btn primary block">Entrar</button>
     </form>
-  </section>
-
-  <section id="disabled" class="login" hidden>
-    <div class="panel login-card">
-      <div class="brand"><span class="mark" aria-hidden="true"></span>Essensa</div>
-      <p>La web está desactivada. Los audios se generan desde el bot de Discord con <b>/voz</b> o <b>/frase</b>.</p>
-    </div>
   </section>
 
   <div class="app" id="app" hidden>
@@ -47,8 +44,8 @@
     <main>
       <form id="generator" class="panel form" novalidate>
         <div class="field">
-          <label for="chatter">Tu ID de chatter</label>
-          <input id="chatter" name="chatter" type="number" inputmode="numeric" min="1" autocomplete="off" aria-describedby="chatter-err" />
+          <label for="chatter">Anotar el consumo a</label>
+          <select id="chatter" name="chatter" aria-describedby="chatter-err"></select>
           <p class="field-error" id="chatter-err" role="alert"></p>
         </div>
 

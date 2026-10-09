@@ -1,39 +1,48 @@
 const crypto = require("crypto");
+const db = require("./db");
+const users = require("./users");
 
 // Sesiones por cookie firmada, sin dependencias ni estado en memoria.
-// Se usa para dos accesos distintos: el panel de administración (ADMIN_PASSWORD)
-// y la web de chatters (CHATTER_PASSWORD). Cada uno tiene su propia cookie.
+// La cookie solo lleva el id de la cuenta y su caducidad; el rol y si la cuenta
+// sigue activa se leen de la base en cada petición, así que desactivar a alguien
+// o cambiarle el rol surte efecto al instante.
 
+const COOKIE = "essensa_sesion";
 const SESSION_MS = 12 * 3600 * 1000;
 const MAX_ATTEMPTS = 10;
 const WINDOW_MS = 15 * 60 * 1000;
 
-// La cookie lleva Secure cuando la conexión es HTTPS. Detrás del proxy del VPS
-// eso lo dice req.secure (con TRUST_PROXY activo); en local por HTTP no se pone,
-// porque el navegador descartaría una cookie Secure y nadie podría entrar.
-// COOKIE_SECURE=1 o 0 fuerza el comportamiento si hace falta.
-function useSecure(req) {
-  if (process.env.COOKIE_SECURE === "1") return true;
-  if (process.env.COOKIE_SECURE === "0") return false;
-  return Boolean(req.secure);
+// Secreto de firma: se guarda en la base la primera vez, para que las sesiones
+// sobrevivan a un reinicio sin tener que configurar nada.
+let cachedSecret = null;
+function sessionSecret() {
+  if (cachedSecret) return cachedSecret;
+  if (process.env.SESSION_SECRET) return (cachedSecret = process.env.SESSION_SECRET);
+  const row = db.prepare("SELECT value FROM settings WHERE key = 'session_secret'").get();
+  if (row) return (cachedSecret = row.value);
+  const value = crypto.randomBytes(32).toString("hex");
+  db.prepare("INSERT INTO settings (key, value) VALUES ('session_secret', ?)").run(value);
+  return (cachedSecret = value);
 }
 
-function sign(secret, payload) {
-  return crypto.createHmac("sha256", secret).update(payload).digest("hex");
+const sign = (payload) => crypto.createHmac("sha256", sessionSecret()).update(payload).digest("hex");
+
+function makeToken(userId) {
+  const payload = `${userId}.${Date.now() + SESSION_MS}`;
+  return `${payload}.${sign(payload)}`;
 }
 
-function makeToken(secret) {
-  const exp = String(Date.now() + SESSION_MS);
-  return `${exp}.${sign(secret, exp)}`;
-}
-
-function validToken(secret, token) {
-  if (!secret || !token) return false;
-  const [exp, sig] = token.split(".");
-  if (!exp || !sig || !/^\d+$/.test(exp) || Number(exp) < Date.now()) return false;
-  const expected = Buffer.from(sign(secret, exp));
+// Devuelve el id de la cuenta si la cookie es válida y no ha caducado.
+function readToken(token) {
+  if (!token) return null;
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  const [id, exp, sig] = parts;
+  if (!/^\d+$/.test(id) || !/^\d+$/.test(exp) || Number(exp) < Date.now()) return null;
+  const expected = Buffer.from(sign(`${id}.${exp}`));
   const given = Buffer.from(sig);
-  return expected.length === given.length && crypto.timingSafeEqual(expected, given);
+  if (expected.length !== given.length || !crypto.timingSafeEqual(expected, given)) return null;
+  return Number(id);
 }
 
 function readCookie(req, name) {
@@ -44,97 +53,81 @@ function readCookie(req, name) {
   return null;
 }
 
-function samePassword(given, real) {
-  const a = Buffer.from(String(given ?? ""));
-  const b = Buffer.from(String(real));
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
+// La cookie lleva Secure cuando la conexión es HTTPS. Detrás del proxy del VPS
+// eso lo dice req.secure (con TRUST_PROXY activo); en local por HTTP no se pone,
+// porque el navegador descartaría una cookie Secure y nadie podría entrar.
+function useSecure(req) {
+  if (process.env.COOKIE_SECURE === "1") return true;
+  if (process.env.COOKIE_SECURE === "0") return false;
+  return Boolean(req.secure);
+}
+
+function setCookie(req, res, value, maxAge) {
+  const bits = [`${COOKIE}=${value}`, "HttpOnly", "SameSite=Strict", "Path=/", `Max-Age=${maxAge}`];
+  if (useSecure(req)) bits.push("Secure");
+  res.setHeader("Set-Cookie", bits.join("; "));
 }
 
 // Freno a la fuerza bruta: cuenta solo los intentos FALLIDOS por IP, y un acierto
-// limpia el contador para no dejar fuera a quien sí sabe la contraseña.
-function createGate() {
-  const fails = new Map();
-  const prune = (now) => {
-    for (const [ip, list] of fails) {
-      const keep = list.filter((t) => now - t < WINDOW_MS);
-      if (keep.length) fails.set(ip, keep);
-      else fails.delete(ip);
-    }
-  };
-  return {
-    blocked(ip) {
-      const now = Date.now();
-      prune(now);
-      return (fails.get(ip) || []).length >= MAX_ATTEMPTS;
-    },
-    fail(ip) {
-      const list = fails.get(ip) || [];
-      list.push(Date.now());
-      fails.set(ip, list);
-    },
-    pass(ip) {
-      fails.delete(ip);
-    },
-  };
-}
-
-// Devuelve { login, logout, require } para un acceso con nombre de cookie y
-// variable de entorno propios.
-function createAuth({ cookieName, secretEnv, label }) {
-  const gate = createGate();
-  const secret = () => process.env[secretEnv] || "";
-
-  function setCookie(req, res, value, maxAge) {
-    const bits = [
-      `${cookieName}=${value}`,
-      "HttpOnly",
-      "SameSite=Strict",
-      "Path=/",
-      `Max-Age=${maxAge}`,
-    ];
-    if (useSecure(req)) bits.push("Secure");
-    res.setHeader("Set-Cookie", bits.join("; "));
+// limpia el contador para no dejar fuera a quien sí sabe su contraseña.
+const fails = new Map();
+function blocked(ip) {
+  const now = Date.now();
+  for (const [k, list] of fails) {
+    const keep = list.filter((t) => now - t < WINDOW_MS);
+    if (keep.length) fails.set(k, keep);
+    else fails.delete(k);
   }
-
-  return {
-    enabled: () => Boolean(secret()),
-
-    login(req, res) {
-      if (!secret()) {
-        return res.status(503).json({ error: `${label} desactivado: falta ${secretEnv} en el entorno` });
-      }
-      if (gate.blocked(req.ip)) {
-        return res.status(429).json({ error: "Demasiados intentos. Espera unos minutos." });
-      }
-      if (!samePassword(req.body?.password, secret())) {
-        gate.fail(req.ip);
-        return res.status(401).json({ error: "Contraseña incorrecta" });
-      }
-      gate.pass(req.ip);
-      setCookie(req, res, makeToken(secret()), SESSION_MS / 1000);
-      res.json({ ok: true });
-    },
-
-    logout(req, res) {
-      setCookie(req, res, "", 0);
-      res.json({ ok: true });
-    },
-
-    // ¿Esta petición trae una sesión válida? (sin responder nada)
-    check(req) {
-      return Boolean(secret()) && validToken(secret(), readCookie(req, cookieName));
-    },
-
-    require(req, res, next) {
-      if (!secret()) {
-        return res.status(503).json({ error: `${label} desactivado: falta ${secretEnv} en el entorno` });
-      }
-      if (!validToken(secret(), readCookie(req, cookieName))) {
-        return res.status(401).json({ error: "No autorizado" });
-      }
-      next();
-    },
-  };
+  return (fails.get(ip) || []).length >= MAX_ATTEMPTS;
 }
 
-module.exports = { createAuth, readCookie, validToken, SESSION_MS };
+// La cuenta de la petición, o null.
+function currentUser(req) {
+  const id = readToken(readCookie(req, COOKIE));
+  if (!id) return null;
+  const user = users.getById(id);
+  return user && user.active ? user : null;
+}
+
+function login(req, res) {
+  if (users.count() === 0) {
+    return res.status(503).json({ error: "Todavía no hay cuentas creadas. Revisa ADMIN_PASSWORD en el servidor." });
+  }
+  if (blocked(req.ip)) {
+    return res.status(429).json({ error: "Demasiados intentos fallidos. Espera unos minutos." });
+  }
+  const user = users.verify(req.body?.username, req.body?.password);
+  if (!user) {
+    fails.set(req.ip, [...(fails.get(req.ip) || []), Date.now()]);
+    return res.status(401).json({ error: "Usuario o contraseña incorrectos" });
+  }
+  fails.delete(req.ip);
+  setCookie(req, res, makeToken(user.id), SESSION_MS / 1000);
+  res.json({ user });
+}
+
+function logout(req, res) {
+  setCookie(req, res, "", 0);
+  res.json({ ok: true });
+}
+
+// Cualquier cuenta activa (admin o manager).
+function requireAuth(req, res, next) {
+  const user = currentUser(req);
+  if (!user) return res.status(401).json({ error: "No autorizado" });
+  req.user = user;
+  next();
+}
+
+// Solo administradores: cuentas, horarios y demás configuración.
+function requireAdmin(req, res, next) {
+  const user = currentUser(req);
+  if (!user) return res.status(401).json({ error: "No autorizado" });
+  if (user.role !== "admin") {
+    return res.status(403).json({ error: "Esta acción es solo para administradores." });
+  }
+  req.user = user;
+  next();
+}
+
+module.exports = { login, logout, requireAuth, requireAdmin, currentUser, COOKIE, SESSION_MS };

@@ -88,6 +88,31 @@ async function loadModels() {
   }
 }
 
+async function loadChatters() {
+  try {
+    const res = await fetch("/api/chatters", { credentials: "same-origin" });
+    if (res.status === 401) return showLogin();
+    if (!res.ok) throw new Error();
+    const list = await res.json();
+    chatterInput.replaceChildren();
+    if (!list.length) {
+      chatterInput.appendChild(option("", "No hay chatters cargados"));
+      chatterInput.disabled = true;
+      return;
+    }
+    list.forEach((c) => chatterInput.appendChild(option(String(c.id), c.name)));
+    // Se recuerda la última elección en este navegador, por comodidad.
+    try {
+      const saved = localStorage.getItem("essensa_chatter_id");
+      if (saved && list.some((c) => String(c.id) === saved)) chatterInput.value = saved;
+    } catch {
+      /* sin almacenamiento disponible */
+    }
+  } catch {
+    setStatus("No se pudo cargar la lista de chatters.", true);
+  }
+}
+
 async function loadPhrases() {
   try {
     const res = await fetch("/api/phrases", { credentials: "same-origin" });
@@ -110,16 +135,10 @@ phraseSelect.addEventListener("change", () => {
 });
 
 textArea.addEventListener("input", updateCount);
-chatterInput.addEventListener("blur", () => {
+chatterInput.addEventListener("change", () => {
   if (chatterInput.value) fieldError("chatter", "chatter-err", "");
 });
 
-// El ID de chatter solo se recuerda en este navegador, como comodidad.
-try {
-  chatterInput.value = localStorage.getItem("essensa_chatter_id") || "";
-} catch {
-  /* sin almacenamiento disponible */
-}
 
 let currentUrl = null;
 
@@ -127,13 +146,13 @@ form.addEventListener("submit", async (e) => {
   e.preventDefault();
   setStatus("");
 
-  const chatterId = chatterInput.value.trim();
+  const chatterId = chatterInput.value;
   const modelId = modelSelect.value;
   const text = textArea.value.trim();
 
   let firstInvalid = null;
   if (!chatterId) {
-    fieldError("chatter", "chatter-err", "Escribe tu ID de chatter.");
+    fieldError("chatter", "chatter-err", "Elige a quién se le anota el consumo.");
     firstInvalid = chatterInput;
   } else {
     fieldError("chatter", "chatter-err", "");
@@ -204,21 +223,19 @@ form.addEventListener("submit", async (e) => {
 /* ---------- Acceso ---------- */
 
 const loginSection = document.getElementById("login");
-const disabledSection = document.getElementById("disabled");
 const appSection = document.getElementById("app");
 
 function showLogin() {
   loginSection.hidden = false;
   appSection.hidden = true;
-  disabledSection.hidden = true;
-  setTimeout(() => document.getElementById("password").focus(), 0);
+  setTimeout(() => document.getElementById("username").focus(), 0);
 }
 
 function showApp() {
   loginSection.hidden = true;
-  disabledSection.hidden = true;
   appSection.hidden = false;
   loadModels();
+  loadChatters();
   loadPhrases();
   updateCount();
 }
@@ -229,11 +246,11 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
   const out = document.getElementById("loginError");
   out.replaceChildren();
   pass.setAttribute("aria-invalid", "false");
-  const r = await fetch("/api/login", {
+  const r = await fetch("/api/admin/login", {
     method: "POST",
     credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ password: pass.value }),
+    body: JSON.stringify({ username: document.getElementById("username").value, password: pass.value }),
   });
   if (r.ok) {
     pass.value = "";
@@ -248,14 +265,13 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
 });
 
 document.getElementById("logout").addEventListener("click", async () => {
-  await fetch("/api/logout", { method: "POST", credentials: "same-origin" });
+  await fetch("/api/admin/logout", { method: "POST", credentials: "same-origin" });
   showLogin();
 });
 
 (async () => {
   try {
     const s = await (await fetch("/api/session", { credentials: "same-origin" })).json();
-    if (!s.enabled) return (disabledSection.hidden = false);
     if (s.authenticated) showApp();
     else showLogin();
   } catch {

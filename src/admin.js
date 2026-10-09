@@ -1,22 +1,97 @@
 const express = require("express");
 const db = require("./db");
 const shifts = require("./shifts");
-const { createAuth } = require("./auth");
+const auth = require("./auth");
+const users = require("./users");
 const tzu = require("./timezone");
 
 const router = express.Router();
 const DAY = 86400000;
 
 // ---------------------------------------------------------------------------
-// Autenticación (contraseña única en ADMIN_PASSWORD, sesión en src/auth.js)
+// Acceso: cuentas individuales con rol (ver src/auth.js y src/users.js)
 // ---------------------------------------------------------------------------
 
-const auth = createAuth({ cookieName: "essensa_admin", secretEnv: "ADMIN_PASSWORD", label: "Panel" });
-const requireAdmin = auth.require;
+const requireAuth = auth.requireAuth;
+const requireAdmin = auth.requireAdmin;
 
 router.post("/login", (req, res) => auth.login(req, res));
 router.post("/logout", (req, res) => auth.logout(req, res));
+router.get("/me", requireAuth, (req, res) => res.json({ user: req.user }));
 
+// Cambiar la propia contraseña (cualquier cuenta).
+router.put("/me/password", requireAuth, (req, res) => {
+  const actual = String(req.body?.current || "");
+  const nueva = String(req.body?.password || "");
+  if (!users.matches(req.user.id, actual)) {
+    return res.status(401).json({ error: "La contraseña actual no es correcta" });
+  }
+  const bad = users.checkPassword(nueva);
+  if (bad) return res.status(400).json({ error: bad });
+  users.update(req.user.id, { password: nueva });
+  res.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// Cuentas (solo administradores)
+// ---------------------------------------------------------------------------
+
+router.get("/users", requireAdmin, (req, res) => res.json({ users: users.list(), roles: users.ROLES }));
+
+router.post("/users", requireAdmin, (req, res) => {
+  const username = String(req.body?.username || "").trim();
+  const displayName = String(req.body?.displayName || "").trim();
+  const password = String(req.body?.password || "");
+  const role = String(req.body?.role || "manager");
+  const bad = users.checkUsername(username) || users.checkPassword(password) || users.checkRole(role);
+  if (bad) return res.status(400).json({ error: bad });
+  if (!displayName) return res.status(400).json({ error: "Escribe el nombre de la persona." });
+  if (users.getByUsername(username)) return res.status(409).json({ error: "Ese usuario ya existe." });
+  res.status(201).json({ user: users.create({ username, displayName, password, role }) });
+});
+
+router.put("/users/:id", requireAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  const target = users.getById(id);
+  if (!target) return res.status(404).json({ error: "Cuenta no encontrada" });
+
+  const patch = {};
+  if (req.body?.displayName !== undefined) {
+    const dn = String(req.body.displayName).trim();
+    if (!dn) return res.status(400).json({ error: "Escribe el nombre de la persona." });
+    patch.displayName = dn;
+  }
+  if (req.body?.role !== undefined) {
+    const bad = users.checkRole(req.body.role);
+    if (bad) return res.status(400).json({ error: bad });
+    patch.role = req.body.role;
+  }
+  if (req.body?.active !== undefined) patch.active = Boolean(req.body.active);
+  if (req.body?.password !== undefined) {
+    const bad = users.checkPassword(req.body.password);
+    if (bad) return res.status(400).json({ error: bad });
+    patch.password = String(req.body.password);
+  }
+
+  // Nunca dejar el sistema sin ningún administrador que pueda entrar.
+  const dejaDeSerAdmin = (patch.role && patch.role !== "admin") || patch.active === false;
+  if (target.role === "admin" && dejaDeSerAdmin && users.countActiveAdmins(id) === 0) {
+    return res.status(409).json({ error: "Debe quedar al menos un administrador activo." });
+  }
+  res.json({ user: users.update(id, patch) });
+});
+
+router.delete("/users/:id", requireAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  const target = users.getById(id);
+  if (!target) return res.status(404).json({ error: "Cuenta no encontrada" });
+  if (id === req.user.id) return res.status(409).json({ error: "No puedes borrar tu propia cuenta." });
+  if (target.role === "admin" && users.countActiveAdmins(id) === 0) {
+    return res.status(409).json({ error: "Debe quedar al menos un administrador activo." });
+  }
+  users.remove(id);
+  res.json({ ok: true });
+});
 // ---------------------------------------------------------------------------
 // Utilidades de rango y datos
 // ---------------------------------------------------------------------------
@@ -159,7 +234,7 @@ async function elevenLabsVoices() {
 // GET /summary — vista general
 // ---------------------------------------------------------------------------
 
-router.get("/summary", requireAdmin, async (req, res) => {
+router.get("/summary", requireAuth, async (req, res) => {
   const now = Date.now();
   const dayStart = tzu.startOfLocalDay(now);
 
@@ -197,6 +272,7 @@ router.get("/summary", requireAdmin, async (req, res) => {
   res.json({
     now,
     tz: tzu.getTz(),
+    user: req.user,
     rules: { shiftMs: shifts.SHIFT_MS, breakMs: shifts.BREAK_MS },
     kpis: {
       openNow: open.length,
@@ -218,7 +294,7 @@ router.get("/summary", requireAdmin, async (req, res) => {
 // GET /fichajes?range=
 // ---------------------------------------------------------------------------
 
-router.get("/fichajes", requireAdmin, (req, res) => {
+router.get("/fichajes", requireAuth, (req, res) => {
   const { now, days, since } = resolveRange(String(req.query.range || "7"));
   const all = enrichShifts(shifts.listSince(since, now));
   const open = enrichShifts(shifts.listOpen(now));
@@ -281,7 +357,7 @@ router.get("/fichajes", requireAdmin, (req, res) => {
 // GET /elevenlabs?range=
 // ---------------------------------------------------------------------------
 
-router.get("/elevenlabs", requireAdmin, async (req, res) => {
+router.get("/elevenlabs", requireAuth, async (req, res) => {
   const { now, days, since } = resolveRange(String(req.query.range || "30"));
   const sinceStr = tzu.sqlTime(since);
 
@@ -369,7 +445,7 @@ router.get("/elevenlabs", requireAdmin, async (req, res) => {
 // Horarios (para detectar llegadas tarde)
 // ---------------------------------------------------------------------------
 
-router.get("/schedules", requireAdmin, (req, res) => {
+router.get("/schedules", requireAuth, (req, res) => {
   const known = db
     .prepare(
       `SELECT discord_id, discord_name FROM shifts WHERE id IN (SELECT MAX(id) FROM shifts GROUP BY discord_id)`
@@ -428,7 +504,7 @@ router.delete("/schedules/:discordId", requireAdmin, (req, res) => {
 // Cerrar un turno que quedó abierto (alguien se fue sin pulsar End)
 // ---------------------------------------------------------------------------
 
-router.post("/shifts/:id/close", requireAdmin, (req, res) => {
+router.post("/shifts/:id/close", requireAuth, (req, res) => {
   const id = Number(req.params.id);
   const shift = db.prepare("SELECT * FROM shifts WHERE id = ?").get(id);
   if (!shift) return res.status(404).json({ error: "Turno no encontrado" });

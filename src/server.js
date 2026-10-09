@@ -4,6 +4,7 @@ const express = require("express");
 const routes = require("./routes");
 const adminRoutes = require("./admin");
 const { startDiscordBot } = require("./discord");
+const users = require("./users");
 
 const app = express();
 
@@ -29,9 +30,9 @@ app.listen(PORT, HOST, () => {
   if (HOST === "0.0.0.0") {
     console.warn("AVISO: el servidor escucha en todas las interfaces. Usa un proxy con HTTPS delante.");
   }
-  if (!process.env.ADMIN_PASSWORD) console.warn("AVISO: sin ADMIN_PASSWORD, el panel /admin está desactivado.");
-  if (!process.env.CHATTER_PASSWORD) {
-    console.log("La web de chatters está desactivada (sin CHATTER_PASSWORD). Los audios se generan desde Discord.");
+  users.bootstrapFromEnv();
+  if (users.count() === 0) {
+    console.warn("AVISO: no hay ninguna cuenta. Pon ADMIN_PASSWORD en el entorno y reinicia para crear la cuenta 'admin'.");
   }
 });
 

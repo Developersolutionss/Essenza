@@ -12,7 +12,7 @@ const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)"
 const RGB = { cost: "245,158,11", saved: "34,197,94", danger: "239,68,68", info: "96,165,250" };
 const COL = { cost: "#f59e0b", saved: "#22c55e", danger: "#ef4444", info: "#60a5fa", fg: "#f8fafc", muted: "#94a3b8", grid: "rgba(148,163,184,.16)", surface: "#1b2336" };
 
-const TITLES = { resumen: "Resumen", fichajes: "Fichajes", elevenlabs: "ElevenLabs", horarios: "Horarios" };
+const TITLES = { resumen: "Resumen", fichajes: "Fichajes", elevenlabs: "ElevenLabs", cuentas: "Cuentas", horarios: "Horarios" };
 const RANGES = [["today", "Hoy"], ["7", "7 días"], ["30", "30 días"], ["90", "90 días"]];
 const REFRESH_MS = 30000;
 const STALE_MS = 95000;
@@ -32,6 +32,7 @@ const state = {
   stale: false,
   timer: null,
   token: 0,
+  user: null,
 };
 
 /* ---------- Iconos (Lucide, trazo 2, decorativos) ---------- */
@@ -52,6 +53,12 @@ const ICONS = {
   coins: '<circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/>',
   info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
   plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  key: '<path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4"/><path d="m21 2-9.6 9.6"/><circle cx="7.5" cy="15.5" r="5.5"/>',
+  shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
+  trash: '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+  key: '<path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4"/><path d="m21 2-9.6 9.6"/><circle cx="7.5" cy="15.5" r="5.5"/>',
+  shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
+  trash: '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
   stop: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 9h6v6H9z"/>',
 };
 const ic = (n) =>
@@ -674,6 +681,106 @@ views.elevenlabs = {
   },
 };
 
+/* Cuentas (solo administradores) */
+views.cuentas = {
+  url: () => "/api/admin/users",
+  render(d) {
+    const rows = d.users.map((u) => [
+      { h: `<span class="who">${esc(u.displayName)}</span>`, v: u.displayName },
+      { h: `<span class="dim mono">${esc(u.username)}</span>`, v: u.username },
+      {
+        h:
+          u.role === "admin"
+            ? pill("good", "shield", "Administrador")
+            : pill("", null, "Manager"),
+        v: u.role,
+      },
+      { h: u.active ? pill("good", "check", "Activa") : pill("warn", "alert", "Desactivada"), v: u.active },
+      { h: `<span class="dim mono">${u.lastLoginAt ? esc(u.lastLoginAt.slice(0, 16)) : "nunca"}</span>`, v: u.lastLoginAt || "" },
+      `<div class="row-actions" data-user="${u.id}" data-name="${esc(u.displayName)}" data-role="${u.role}" data-active="${u.active}" data-self="${u.id === state.user?.id}">` +
+        `<button type="button" class="btn sm ghost act-pass" data-key="pass-${u.id}">${ic("key")}Contraseña</button>` +
+        `<button type="button" class="btn sm ghost act-role" data-key="role-${u.id}">${u.role === "admin" ? "Hacer manager" : "Hacer admin"}</button>` +
+        `<button type="button" class="btn sm ghost act-active" data-key="act-${u.id}">${u.active ? "Desactivar" : "Activar"}</button>` +
+        `<button type="button" class="btn sm danger act-del" data-key="del-${u.id}">${ic("trash")}Borrar</button>` +
+        `</div><span class="row-msg" role="alert"></span>`,
+    ]);
+
+    const html = `
+      ${head("Cuentas", "Quién puede entrar al panel y con qué permisos")}
+      <div class="note section">${ic("info")}<span><b>Administrador</b>: todo, incluidas cuentas y horarios. <b>Manager</b>: ve el panel y cierra turnos abiertos, pero no cambia cuentas ni horarios.</span></div>
+      <section class="panel section" aria-labelledby="h-us"><div class="head"><h2 id="h-us">Personas con acceso</h2></div>
+        <p class="sub">Siempre debe quedar al menos un administrador activo.</p>
+        ${table("users", "Cuentas del panel", [{ h: "Nombre", sort: "text" }, { h: "Usuario", sort: "text" }, { h: "Rol", sort: "text" }, { h: "Estado", sort: "text" }, { h: "Última entrada", sort: "text" }, { h: "" }], rows)}</section>
+      <section class="panel section" aria-labelledby="h-new"><div class="head"><h2 id="h-new">Crear cuenta</h2></div>
+        <p class="sub">Dale la contraseña a la persona por un canal privado. Puede cambiarla desde Mi cuenta.</p>
+        <form id="userForm" class="row-form" novalidate>
+          <div class="field"><label for="u-name">Nombre</label><input id="u-name" name="displayName" maxlength="80" autocomplete="off" aria-describedby="err-displayName" /><p class="field-error" id="err-displayName" role="alert"></p></div>
+          <div class="field"><label for="u-user">Usuario</label><input id="u-user" name="username" class="mono" autocomplete="off" aria-describedby="err-username" /><p class="field-error" id="err-username" role="alert"></p></div>
+          <div class="field"><label for="u-pass">Contraseña</label><input id="u-pass" name="password" type="text" class="mono" autocomplete="off" aria-describedby="err-password" /><p class="field-error" id="err-password" role="alert"></p></div>
+          <div class="field"><label for="u-role">Rol</label><select id="u-role" name="role"><option value="manager">Manager</option><option value="admin">Administrador</option></select></div>
+          <button class="btn primary" type="submit">${ic("plus")}Crear</button>
+        </form></section>
+      <section class="panel" aria-labelledby="h-mine"><div class="head"><h2 id="h-mine">Mi cuenta</h2></div>
+        <p class="sub">Cambia tu propia contraseña.</p>
+        <form id="passForm" class="row-form" novalidate>
+          <div class="field"><label for="p-cur">Contraseña actual</label><input id="p-cur" name="current" type="password" autocomplete="current-password" aria-describedby="err-current" /><p class="field-error" id="err-current" role="alert"></p></div>
+          <div class="field"><label for="p-new">Contraseña nueva</label><input id="p-new" name="newPassword" type="password" autocomplete="new-password" aria-describedby="err-newPassword" /><p class="field-error" id="err-newPassword" role="alert"></p></div>
+          <button class="btn primary" type="submit">Cambiar</button>
+        </form></section>`;
+    return { html, after() {} };
+  },
+};
+
+/* Cuentas (solo administradores) */
+views.cuentas = {
+  url: () => "/api/admin/users",
+  render(d) {
+    const rows = d.users.map((u) => [
+      { h: `<span class="who">${esc(u.displayName)}</span>`, v: u.displayName },
+      { h: `<span class="dim mono">${esc(u.username)}</span>`, v: u.username },
+      {
+        h:
+          u.role === "admin"
+            ? pill("good", "shield", "Administrador")
+            : pill("", null, "Manager"),
+        v: u.role,
+      },
+      { h: u.active ? pill("good", "check", "Activa") : pill("warn", "alert", "Desactivada"), v: u.active },
+      { h: `<span class="dim mono">${u.lastLoginAt ? esc(u.lastLoginAt.slice(0, 16)) : "nunca"}</span>`, v: u.lastLoginAt || "" },
+      `<div class="row-actions" data-user="${u.id}" data-name="${esc(u.displayName)}" data-role="${u.role}" data-active="${u.active}" data-self="${u.id === state.user?.id}">` +
+        `<button type="button" class="btn sm ghost act-pass" data-key="pass-${u.id}">${ic("key")}Contraseña</button>` +
+        `<button type="button" class="btn sm ghost act-role" data-key="role-${u.id}">${u.role === "admin" ? "Hacer manager" : "Hacer admin"}</button>` +
+        `<button type="button" class="btn sm ghost act-active" data-key="act-${u.id}">${u.active ? "Desactivar" : "Activar"}</button>` +
+        `<button type="button" class="btn sm danger act-del" data-key="del-${u.id}">${ic("trash")}Borrar</button>` +
+        `</div><span class="row-msg" role="alert"></span>`,
+    ]);
+
+    const html = `
+      ${head("Cuentas", "Quién puede entrar al panel y con qué permisos")}
+      <div class="note section">${ic("info")}<span><b>Administrador</b>: todo, incluidas cuentas y horarios. <b>Manager</b>: ve el panel y cierra turnos abiertos, pero no cambia cuentas ni horarios.</span></div>
+      <section class="panel section" aria-labelledby="h-us"><div class="head"><h2 id="h-us">Personas con acceso</h2></div>
+        <p class="sub">Siempre debe quedar al menos un administrador activo.</p>
+        ${table("users", "Cuentas del panel", [{ h: "Nombre", sort: "text" }, { h: "Usuario", sort: "text" }, { h: "Rol", sort: "text" }, { h: "Estado", sort: "text" }, { h: "Última entrada", sort: "text" }, { h: "" }], rows)}</section>
+      <section class="panel section" aria-labelledby="h-new"><div class="head"><h2 id="h-new">Crear cuenta</h2></div>
+        <p class="sub">Dale la contraseña a la persona por un canal privado. Puede cambiarla desde Mi cuenta.</p>
+        <form id="userForm" class="row-form" novalidate>
+          <div class="field"><label for="u-name">Nombre</label><input id="u-name" name="displayName" maxlength="80" autocomplete="off" aria-describedby="err-displayName" /><p class="field-error" id="err-displayName" role="alert"></p></div>
+          <div class="field"><label for="u-user">Usuario</label><input id="u-user" name="username" class="mono" autocomplete="off" aria-describedby="err-username" /><p class="field-error" id="err-username" role="alert"></p></div>
+          <div class="field"><label for="u-pass">Contraseña</label><input id="u-pass" name="password" type="text" class="mono" autocomplete="off" aria-describedby="err-password" /><p class="field-error" id="err-password" role="alert"></p></div>
+          <div class="field"><label for="u-role">Rol</label><select id="u-role" name="role"><option value="manager">Manager</option><option value="admin">Administrador</option></select></div>
+          <button class="btn primary" type="submit">${ic("plus")}Crear</button>
+        </form></section>
+      <section class="panel" aria-labelledby="h-mine"><div class="head"><h2 id="h-mine">Mi cuenta</h2></div>
+        <p class="sub">Cambia tu propia contraseña.</p>
+        <form id="passForm" class="row-form" novalidate>
+          <div class="field"><label for="p-cur">Contraseña actual</label><input id="p-cur" name="current" type="password" autocomplete="current-password" aria-describedby="err-current" /><p class="field-error" id="err-current" role="alert"></p></div>
+          <div class="field"><label for="p-new">Contraseña nueva</label><input id="p-new" name="newPassword" type="password" autocomplete="new-password" aria-describedby="err-newPassword" /><p class="field-error" id="err-newPassword" role="alert"></p></div>
+          <button class="btn primary" type="submit">Cambiar</button>
+        </form></section>`;
+    return { html, after() {} };
+  },
+};
+
 /* Horarios */
 views.horarios = {
   url: () => "/api/admin/schedules",
@@ -722,6 +829,16 @@ function normalizeTime(v) {
   return m ? `${m[1].padStart(2, "0")}:${m[2]}` : v.trim();
 }
 const RULES = {
+  displayName: (v) => (v.trim() ? "" : "Escribe el nombre de la persona."),
+  username: (v) => (/^[a-zA-Z0-9._-]{3,32}$/.test(v.trim()) ? "" : "Entre 3 y 32 caracteres: letras, números, punto, guion o guion bajo."),
+  password: (v) => (v.length >= 10 ? "" : "Al menos 10 caracteres."),
+  current: (v) => (v ? "" : "Escribe tu contraseña actual."),
+  newPassword: (v) => (v.length >= 10 ? "" : "Al menos 10 caracteres."),
+  displayName: (v) => (v.trim() ? "" : "Escribe el nombre de la persona."),
+  username: (v) => (/^[a-zA-Z0-9._-]{3,32}$/.test(v.trim()) ? "" : "Entre 3 y 32 caracteres: letras, números, punto, guion o guion bajo."),
+  password: (v) => (v.length >= 10 ? "" : "Al menos 10 caracteres."),
+  current: (v) => (v ? "" : "Escribe tu contraseña actual."),
+  newPassword: (v) => (v.length >= 10 ? "" : "Al menos 10 caracteres."),
   name: (v) => (v.trim() ? "" : "Escribe el nombre de la persona."),
   discordId: (v) => (/^\d{5,25}$/.test(v.trim()) ? "" : "El ID de Discord tiene entre 5 y 25 dígitos."),
   start: (v) => (/^([01]\d|2[0-3]):[0-5]\d$/.test(normalizeTime(v)) ? "" : "Usa el formato de 24 horas, por ejemplo 14:30."),
@@ -835,7 +952,9 @@ async function load({ silent = false, routeChange = false } = {}) {
 
 function go() {
   const r = (location.hash || "#resumen").slice(1);
+  const soloAdmin = new Set(["cuentas", "horarios"]);
   state.route = views[r] ? r : "resumen";
+  if (soloAdmin.has(state.route) && state.user?.role !== "admin") state.route = "resumen";
   state.animate = true;
   state.sort = {};
   document.title = `${TITLES[state.route]} · Essensa`;
@@ -849,17 +968,31 @@ function go() {
 
 function showLogin() {
   clearTimeout(state.timer);
+  state.user = null;
+  state.user = null;
   $("#login").hidden = false;
   $("#app").hidden = true;
   document.title = "Acceso · Essensa";
-  setTimeout(() => $("#password").focus(), 0);
+  setTimeout(() => $("#username").focus(), 0);
+}
+
+function paintUser() {
+  const u = state.user;
+  if (!u) return;
+  $("#whoami").innerHTML = `<b>${esc(u.displayName)}</b><span>${u.role === "admin" ? "Administrador" : "Manager"}</span>`;
+  // Un manager no ve las secciones de configuración.
+  document.querySelectorAll("#nav a[data-admin]").forEach((a) => {
+    a.hidden = u.role !== "admin";
+  });
 }
 
 async function boot() {
   try {
-    await getJSON("/api/admin/summary");
+    const me = await getJSON("/api/admin/me");
+    state.user = me.user;
     $("#login").hidden = true;
     $("#app").hidden = false;
+    paintUser();
     go();
   } catch (e) {
     if (e.message !== "auth") showLogin();
@@ -884,7 +1017,7 @@ $("#loginForm").addEventListener("submit", async (e) => {
   const r = await api("/api/admin/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ password: $("#password").value }),
+    body: JSON.stringify({ username: $("#username").value, password: $("#password").value }),
   });
   if (r.ok) {
     $("#password").value = "";
@@ -941,6 +1074,90 @@ $("#view").addEventListener("click", async (e) => {
 
   const actions = e.target.closest(".row-actions");
   if (!actions) return;
+
+  // Cuentas del panel.
+  if (actions.dataset.user) {
+    const id = actions.dataset.user;
+    const who = actions.dataset.name;
+    const msg = $(".row-msg", actions.closest("tr"));
+    msg.textContent = "";
+    const send = async (method, body) => {
+      const res = await api(`/api/admin/users/${id}`, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      if (!res.ok) {
+        msg.textContent = (await res.json().catch(() => ({}))).error || "No se pudo guardar.";
+        return false;
+      }
+      return true;
+    };
+    try {
+      if (e.target.closest(".act-pass")) {
+        const nueva = window.prompt(`Contraseña nueva para ${who} (mínimo 10 caracteres):`);
+        if (nueva === null) return;
+        if (nueva.length < 10) return (msg.textContent = "Al menos 10 caracteres.");
+        if (await send("PUT", { password: nueva })) toast(`Contraseña de ${who} cambiada`);
+      } else if (e.target.closest(".act-role")) {
+        const nuevo = actions.dataset.role === "admin" ? "manager" : "admin";
+        if (!window.confirm(`¿Cambiar a ${who} al rol ${nuevo}?`)) return;
+        if (await send("PUT", { role: nuevo })) { toast(`${who} ahora es ${nuevo}`); load({ silent: true }); }
+      } else if (e.target.closest(".act-active")) {
+        const activar = actions.dataset.active !== "1";
+        if (!activar && !window.confirm(`¿Desactivar a ${who}? Perderá el acceso al instante.`)) return;
+        if (await send("PUT", { active: activar })) { toast(`${who} ${activar ? "activada" : "desactivada"}`); load({ silent: true }); }
+      } else if (e.target.closest(".act-del")) {
+        if (!window.confirm(`¿Borrar la cuenta de ${who}? No se puede deshacer.`)) return;
+        if (await send("DELETE")) { toast(`Cuenta de ${who} borrada`); load({ silent: true }); }
+      } else return;
+    } catch (err) {
+      if (err.message !== "auth") toast(err.message, true);
+    }
+    return;
+  }
+
+  // Cuentas del panel.
+  if (actions.dataset.user) {
+    const id = actions.dataset.user;
+    const who = actions.dataset.name;
+    const msg = $(".row-msg", actions.closest("tr"));
+    msg.textContent = "";
+    const send = async (method, body) => {
+      const res = await api(`/api/admin/users/${id}`, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      if (!res.ok) {
+        msg.textContent = (await res.json().catch(() => ({}))).error || "No se pudo guardar.";
+        return false;
+      }
+      return true;
+    };
+    try {
+      if (e.target.closest(".act-pass")) {
+        const nueva = window.prompt(`Contraseña nueva para ${who} (mínimo 10 caracteres):`);
+        if (nueva === null) return;
+        if (nueva.length < 10) return (msg.textContent = "Al menos 10 caracteres.");
+        if (await send("PUT", { password: nueva })) toast(`Contraseña de ${who} cambiada`);
+      } else if (e.target.closest(".act-role")) {
+        const nuevo = actions.dataset.role === "admin" ? "manager" : "admin";
+        if (!window.confirm(`¿Cambiar a ${who} al rol ${nuevo}?`)) return;
+        if (await send("PUT", { role: nuevo })) { toast(`${who} ahora es ${nuevo}`); load({ silent: true }); }
+      } else if (e.target.closest(".act-active")) {
+        const activar = actions.dataset.active !== "1";
+        if (!activar && !window.confirm(`¿Desactivar a ${who}? Perderá el acceso al instante.`)) return;
+        if (await send("PUT", { active: activar })) { toast(`${who} ${activar ? "activada" : "desactivada"}`); load({ silent: true }); }
+      } else if (e.target.closest(".act-del")) {
+        if (!window.confirm(`¿Borrar la cuenta de ${who}? No se puede deshacer.`)) return;
+        if (await send("DELETE")) { toast(`Cuenta de ${who} borrada`); load({ silent: true }); }
+      } else return;
+    } catch (err) {
+      if (err.message !== "auth") toast(err.message, true);
+    }
+    return;
+  }
 
   // Cerrar un turno que quedó abierto (alguien se fue sin pulsar End).
   if (actions.dataset.shift) {
@@ -1001,12 +1218,57 @@ $("#view").addEventListener("click", async (e) => {
 /* Validación al salir del campo y al enviar. */
 $("#view").addEventListener("focusout", (e) => {
   const input = e.target;
-  if (!input.form || !input.form.matches("#addForm") || !RULES[input.name]) return;
+  if (!input.form || !input.form.matches("#addForm, #userForm, #passForm") || !RULES[input.name]) return;
   if (input.name === "start") input.value = normalizeTime(input.value);
   if (input.value !== "" || input.getAttribute("aria-invalid") === "true") setError(input, RULES[input.name](input.value));
 });
 
 $("#view").addEventListener("submit", async (e) => {
+  // Crear una cuenta nueva del panel.
+  if (e.target.matches("#userForm")) {
+    e.preventDefault();
+    const f = e.target;
+    let bad = null;
+    for (const n of ["displayName", "username", "password"]) {
+      if (setError(f.elements[n], RULES[n](f.elements[n].value)) && !bad) bad = f.elements[n];
+    }
+    if (bad) return bad.focus();
+    const res = await api("/api/admin/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        displayName: f.elements.displayName.value.trim(),
+        username: f.elements.username.value.trim(),
+        password: f.elements.password.value,
+        role: f.elements.role.value,
+      }),
+    });
+    if (!res.ok) return toast((await res.json().catch(() => ({}))).error || "No se pudo crear la cuenta.", true);
+    toast(`Cuenta de ${f.elements.displayName.value.trim()} creada`);
+    load({ silent: true });
+    return;
+  }
+
+  // Cambiar la propia contraseña.
+  if (e.target.matches("#passForm")) {
+    e.preventDefault();
+    const f = e.target;
+    let bad = null;
+    for (const n of ["current", "newPassword"]) {
+      if (setError(f.elements[n], RULES[n](f.elements[n].value)) && !bad) bad = f.elements[n];
+    }
+    if (bad) return bad.focus();
+    const res = await api("/api/admin/me/password", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ current: f.elements.current.value, password: f.elements.newPassword.value }),
+    });
+    if (!res.ok) return toast((await res.json().catch(() => ({}))).error || "No se pudo cambiar.", true);
+    f.reset();
+    toast("Tu contraseña se cambió");
+    return;
+  }
+
   if (!e.target.matches("#addForm")) return;
   e.preventDefault();
   const form = e.target;

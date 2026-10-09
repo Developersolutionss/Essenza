@@ -22,6 +22,10 @@
       <div class="brand"><span class="mark" aria-hidden="true"></span>Essensa</div>
       <h1 id="login-title" class="login-title">Panel de administración</h1>
       <div class="field">
+        <label for="username">Usuario</label>
+        <input id="username" name="username" autocomplete="username" required />
+      </div>
+      <div class="field">
         <label for="password">Contraseña</label>
         <input id="password" type="password" autocomplete="current-password" required aria-describedby="loginError" />
         <p id="loginError" class="field-error" role="alert"></p>
@@ -54,12 +58,17 @@
           <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 10v3"/><path d="M6 6v11"/><path d="M10 3v18"/><path d="M14 8v7"/><path d="M18 5v13"/><path d="M22 10v3"/></svg>
           <span>ElevenLabs</span>
         </a>
-        <a href="#horarios" data-route="horarios">
+        <a href="#cuentas" data-route="cuentas" data-admin>
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>Cuentas</span>
+        </a>
+        <a href="#horarios" data-route="horarios" data-admin>
           <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>
           <span>Horarios</span>
         </a>
       </nav>
       <div class="side-foot">
+        <div class="whoami" id="whoami"></div>
         <div class="clock" id="clock" aria-hidden="true">--:--</div>
         <div class="tz" id="tz"></div>
         <button type="button" class="btn ghost sm js-logout">

@@ -123,10 +123,11 @@ input.narrow { width: 96px; }
   .side > .brand, .side-foot { display: none; }
   #nav {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; margin: 0;
-    grid-template-columns: repeat(4, 1fr); gap: 0; background: var(--surface); border-top: 1px solid var(--border);
+    display: flex; gap: 0; background: var(--surface); border-top: 1px solid var(--border);
     padding-bottom: env(safe-area-inset-bottom);
   }
-  #nav a { flex-direction: column; justify-content: center; gap: 2px; min-height: 56px; border-radius: 0; font-size: var(--fs-xs); box-shadow: none !important; }
+  #nav a { flex: 1 1 0; min-width: 0; flex-direction: column; justify-content: center; gap: 2px; min-height: 56px; text-align: center; border-radius: 0; font-size: var(--fs-xs); box-shadow: none !important; }
+  #nav a span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
   #nav a[aria-current="page"] { background: transparent; color: var(--accent); }
   .main { padding: var(--sp-4) var(--sp-4) 96px; }
   .statusbar { justify-content: flex-start; }
@@ -138,3 +139,9 @@ input.narrow { width: 96px; }
 td.wrap, th.wrap { white-space: normal; min-width: 180px; }
 
 @media (max-width: 420px) { .kpi { padding: var(--sp-3); } .kpi .v { font-size: 1.5rem; } }
+
+/* Identidad de la sesión */
+.whoami { display: grid; gap: 2px; margin-bottom: var(--sp-3); font-size: var(--fs-xs); }
+.whoami b { font-weight: 600; font-size: var(--fs-sm); }
+.whoami span { color: var(--fg-muted); font-family: var(--font-data); }
+@media (max-width: 860px) { .whoami { display: none; } }
