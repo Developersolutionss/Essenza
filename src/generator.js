@@ -25,16 +25,6 @@ async function generateAudio({ chatterId, modelId, text }) {
   const model = db.prepare("SELECT * FROM models WHERE id = ? AND active = 1").get(modelId);
   if (!model) throw new GenerationError(404, "Modelo no encontrado o inactivo");
 
-  const consent = db
-    .prepare("SELECT id FROM model_consent WHERE model_id = ? ORDER BY created_at DESC LIMIT 1")
-    .get(modelId);
-  if (!consent) {
-    throw new GenerationError(
-      403,
-      "Esta modelo no tiene un registro de consentimiento cargado. No se puede generar audio."
-    );
-  }
-
   const charCount = text.trim().length;
   const usedToday = getUsedToday(chatterId);
   const limit = chatter.daily_char_limit || DEFAULT_DAILY_LIMIT;

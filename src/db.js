@@ -5,7 +5,7 @@ const { DatabaseSync } = require("node:sqlite");
 const dataDir = path.join(__dirname, "..", "data");
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
-const db = new DatabaseSync(path.join(dataDir, "essensa.db"));
+const db = new DatabaseSync(process.env.DB_PATH || path.join(dataDir, "essensa.db"));
 db.exec("PRAGMA journal_mode = WAL;");
 db.exec("PRAGMA foreign_keys = ON;");
 
@@ -71,6 +71,27 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_usage_chatter_date ON usage_log(chatter_id, created_at);
   CREATE INDEX IF NOT EXISTS idx_cache_lookup ON audio_cache(model_id, text_hash);
+`);
+
+// Fichajes: turnos y breaks (tiempos en milisegundos epoch).
+db.exec(`
+  CREATE TABLE IF NOT EXISTS shifts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    discord_id TEXT NOT NULL,
+    discord_name TEXT NOT NULL,
+    started_at INTEGER NOT NULL,
+    ended_at INTEGER
+  );
+  CREATE TABLE IF NOT EXISTS shift_breaks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    shift_id INTEGER NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
+    started_at INTEGER NOT NULL,
+    ended_at INTEGER
+  );
+  -- Una persona no puede tener dos turnos abiertos a la vez.
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_one_open_shift ON shifts(discord_id) WHERE ended_at IS NULL;
+  CREATE INDEX IF NOT EXISTS idx_shifts_started ON shifts(started_at);
+  CREATE INDEX IF NOT EXISTS idx_breaks_shift ON shift_breaks(shift_id);
 `);
 
 // Migración: vincular cada chatter con su usuario de Discord.

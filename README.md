@@ -28,20 +28,37 @@ El bot corre dentro del mismo proceso que el servidor y se activa si hay
 Comandos: `/voz modelo texto`, `/frase modelo frase`, `/uso`, `/vincular`.
 Las respuestas son efímeras (solo las ve quien las pidió) y el mp3 va adjunto.
 
+## Fichajes
+
+`/panel-fichajes` (permiso Gestionar servidor) publica en el canal un panel con los
+botones **Start**, **Break**, **Resume**, **End** y **Mi estado**, y la lista de quién
+está en turno o en break.
+
+- Para pulsar **End** hay que acumular 8 h de trabajo efectivo. El tiempo de break no cuenta.
+- El break es de 30 min por turno (se puede dividir). El exceso queda marcado en el panel web.
+- Reglas ajustables en `.env`: `SHIFT_HOURS` y `BREAK_MINUTES`.
+
+## Panel de administrador
+
+`http://localhost:3000/admin`, protegido por `ADMIN_PASSWORD` en `.env` (sin esa variable el panel queda desactivado).
+Muestra créditos de ElevenLabs (saldo real del plan y consumo propio), voces más usadas,
+consumo por chatter, ahorro por caché, fichajes en vivo e historial de turnos con excesos de break.
+
 ## Antes de usar con una modelo real
 
 1. Clonar su voz en ElevenLabs (Instant Voice Clone) y copiar el `voice_id`.
 2. Cargar el modelo en la tabla `models` con ese `voice_id`.
-3. Cargar el registro de consentimiento en `model_consent` — **el endpoint
-   de generación rechaza pedidos para modelos sin consentimiento cargado**.
+3. Poner el `voice_id` en `models.json` y ejecutar `node src/loadModels.js`.
 
 ## Estructura
 
-- `src/db.js` — schema SQLite (modelos, consentimiento, chatters, caché, uso).
+- `src/db.js` — schema SQLite (modelos, chatters, caché, uso).
 - `src/providers/` — capa de proveedor de voz, desacoplada para poder
   swapear ElevenLabs por otro proveedor sin tocar el resto del sistema.
-- `src/generator.js` — lógica única de generación (consentimiento, límite, caché), usada por web y bot.
+- `src/generator.js` — lógica única de generación (límite, caché), usada por web y bot.
 - `src/discord.js` — bot de Discord (comandos slash).
+- `src/shifts.js` / `src/fichajes.js` — lógica y botones de fichajes.
+- `src/admin.js` + `public/admin.*` — panel de administrador.
 - `src/routes.js` — API: modelos, frases, generación, resumen de uso.
 - `public/` — frontend simple para chatters.
 

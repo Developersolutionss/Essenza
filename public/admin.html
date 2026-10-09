@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Essensa · Administración</title>
+  <link rel="stylesheet" href="admin.css" />
+</head>
+<body>
+  <section id="login" class="login hidden">
+    <form id="loginForm" class="card login-card">
+      <h1>Essensa</h1>
+      <p class="muted">Panel de administración</p>
+      <input id="password" type="password" placeholder="Contraseña" autocomplete="current-password" required />
+      <button type="submit">Entrar</button>
+      <p id="loginError" class="error"></p>
+    </form>
+  </section>
+
+  <main id="app" class="hidden">
+    <header class="top">
+      <div>
+        <h1>Administración</h1>
+        <p class="muted" id="updated"></p>
+      </div>
+      <div class="actions">
+        <label class="muted">Periodo
+          <select id="days">
+            <option value="1">Hoy</option>
+            <option value="7">7 días</option>
+            <option value="30" selected>30 días</option>
+            <option value="90">90 días</option>
+          </select>
+        </label>
+        <button id="logout" class="ghost">Salir</button>
+      </div>
+    </header>
+
+    <section class="kpis" id="kpis"></section>
+
+    <section class="grid">
+      <div class="card">
+        <h2>Voces más usadas</h2>
+        <p class="muted small">Ordenadas por caracteres generados con ElevenLabs en el periodo.</p>
+        <div id="voices"></div>
+      </div>
+      <div class="card">
+        <h2>Consumo por chatter</h2>
+        <div id="chatters"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Consumo diario de caracteres</h2>
+      <div id="daily" class="daily"></div>
+    </section>
+
+    <section class="card">
+      <h2>Fichajes en vivo</h2>
+      <div id="open"></div>
+    </section>
+
+    <section class="card">
+      <h2>Historial de turnos</h2>
+      <p class="muted small">Un turno se marca si el break superó el límite o si sigue abierto.</p>
+      <div id="history"></div>
+    </section>
+  </main>
+
+  <script src="admin.js"></script>
+</body>
+</html>

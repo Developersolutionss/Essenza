@@ -9,6 +9,7 @@ const {
   MessageFlags,
 } = require("discord.js");
 const db = require("./db");
+const { panelPayload, handleShiftButton } = require("./fichajes");
 const { generateAudio, getUsedToday, GenerationError, DEFAULT_DAILY_LIMIT } = require("./generator");
 
 const MAX_TEXT = 1000;
@@ -32,6 +33,10 @@ const commands = [
     .addStringOption((o) =>
       o.setName("frase").setDescription("Frase").setRequired(true).setAutocomplete(true)
     ),
+  new SlashCommandBuilder()
+    .setName("panel-fichajes")
+    .setDescription("(Manager) Publica el panel de fichajes en este canal")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   new SlashCommandBuilder().setName("uso").setDescription("Tu consumo de caracteres de hoy"),
   new SlashCommandBuilder()
     .setName("vincular")
@@ -92,6 +97,23 @@ async function replyWithAudio(interaction, chatter, modelId, text) {
 
 async function handleCommand(interaction) {
   const name = interaction.commandName;
+
+  if (name === "panel-fichajes") {
+    await interaction.reply(panelPayload());
+    // Se fija el panel para que siempre esté a mano en el canal.
+    try {
+      const msg = await interaction.fetchReply();
+      await msg.pin();
+    } catch (err) {
+      console.error("No se pudo fijar el panel:", err.message);
+      await interaction.followUp({
+        content:
+          "⚠️ Publiqué el panel pero no pude fijarlo. Dale al bot el permiso **Fijar mensajes** (o Gestionar mensajes) en este canal, o fíjalo a mano.",
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+    return;
+  }
 
   if (name === "vincular") {
     const user = interaction.options.getUser("usuario");
@@ -160,6 +182,8 @@ async function startDiscordBot() {
     ? Routes.applicationGuildCommands(clientId, guildId)
     : Routes.applicationCommands(clientId);
   await rest.put(route, { body: commands });
+  // Con comandos de servidor, se vacían los globales para que no aparezcan duplicados.
+  if (guildId) await rest.put(Routes.applicationCommands(clientId), { body: [] });
 
   const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
@@ -170,6 +194,9 @@ async function startDiscordBot() {
         return await interaction.respond(autocompleteRows(focused.name, focused.value));
       }
       if (interaction.isChatInputCommand()) return await handleCommand(interaction);
+      if (interaction.isButton() && interaction.customId.startsWith("shift:")) {
+        return await handleShiftButton(interaction);
+      }
     } catch (err) {
       console.error("Error en interacción de Discord:", err);
     }
