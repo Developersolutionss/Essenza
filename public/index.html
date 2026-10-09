@@ -3,37 +3,77 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Essensa — Generador de audios</title>
+  <meta name="color-scheme" content="dark" />
+  <title>Generador de audios · Essensa</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="/ds.css" />
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
+  <a class="skip-link" href="#generator">Saltar al formulario</a>
+
   <div class="app">
-    <header>
+    <header class="top">
+      <div class="brand"><span class="mark" aria-hidden="true"></span>Essensa</div>
       <h1>Generador de audios</h1>
-      <p class="sub">Elegí la modelo, escribí el mensaje y generá el audio.</p>
+      <p class="lead">Elige la modelo, escribe el mensaje y genera la nota de voz.</p>
     </header>
 
     <main>
-      <label for="chatter">Tu nombre (chatter_id)</label>
-      <input id="chatter" type="number" placeholder="ID de chatter" />
+      <form id="generator" class="panel form" novalidate>
+        <div class="field">
+          <label for="chatter">Tu ID de chatter</label>
+          <input id="chatter" name="chatter" type="number" inputmode="numeric" min="1" autocomplete="off" aria-describedby="chatter-err" />
+          <p class="field-error" id="chatter-err" role="alert"></p>
+        </div>
 
-      <label for="model">Modelo</label>
-      <select id="model"></select>
+        <div class="field">
+          <label for="model">Modelo</label>
+          <select id="model" name="model" aria-describedby="model-err"></select>
+          <p class="field-error" id="model-err" role="alert"></p>
+        </div>
 
-      <label for="phrase">Frase rápida (opcional)</label>
-      <select id="phrase">
-        <option value="">— Escribir manualmente —</option>
-      </select>
+        <div class="field">
+          <label for="phrase">Frase rápida <span class="opt">(opcional)</span></label>
+          <select id="phrase" name="phrase">
+            <option value="">Escribir manualmente</option>
+          </select>
+        </div>
 
-      <label for="text">Texto</label>
-      <textarea id="text" rows="4" placeholder="Escribí el mensaje que va a decir el audio..."></textarea>
+        <div class="field">
+          <label for="text">Texto</label>
+          <textarea id="text" name="text" rows="5" maxlength="1000" placeholder="Escribe el mensaje que dirá el audio" aria-describedby="text-hint text-err"></textarea>
+          <div class="field-foot">
+            <p class="field-error" id="text-err" role="alert"></p>
+            <p class="hint" id="text-hint"><span id="count">0</span> / 1000 caracteres</p>
+          </div>
+        </div>
 
-      <button id="generate">Generar audio</button>
+        <button id="generate" type="submit" class="btn primary block">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 10v3"/><path d="M6 6v11"/><path d="M10 3v18"/><path d="M14 8v7"/><path d="M18 5v13"/><path d="M22 10v3"/></svg>
+          <span class="spinner" id="spinner" hidden aria-hidden="true"></span>
+          <span id="generate-label">Generar audio</span>
+        </button>
 
-      <div id="status" class="status"></div>
+        <p id="status" class="status" role="status" aria-live="polite"></p>
+      </form>
 
-      <audio id="player" controls style="display:none; width: 100%; margin-top: 16px;"></audio>
-      <a id="download" style="display:none;" download="audio.mp3">Descargar MP3</a>
+      <section id="result" class="panel result" hidden aria-labelledby="result-title" tabindex="-1">
+        <div class="head">
+          <h2 id="result-title">Tu audio</h2>
+          <span id="source" class="pill"></span>
+        </div>
+        <audio id="player" controls preload="auto"></audio>
+        <a id="download" class="btn" download="audio.mp3" href="#">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+          Descargar MP3
+        </a>
+      </section>
     </main>
   </div>
 

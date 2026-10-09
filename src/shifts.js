@@ -30,6 +30,7 @@ function summarize(shift, breaks, now = Date.now()) {
     openBreakStartedAt: openBreak ? openBreak.started_at : null,
     canEnd: !openBreak && workedMs >= SHIFT_MS,
     remainingMs: Math.max(0, SHIFT_MS - workedMs),
+    breaks: breaks.map((b) => ({ startedAt: b.started_at, endedAt: b.ended_at })),
   };
 }
 

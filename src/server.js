@@ -9,6 +9,7 @@ const app = express();
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "..", "public")));
+app.use("/vendor", express.static(path.join(__dirname, "..", "node_modules", "chart.js", "dist")));
 app.use("/api/admin", adminRoutes);
 app.use("/api", routes);
 app.get("/admin", (req, res) => res.sendFile(path.join(__dirname, "..", "public", "admin.html")));

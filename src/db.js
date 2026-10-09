@@ -94,6 +94,16 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_breaks_shift ON shift_breaks(shift_id);
 `);
 
+// Horarios: hora de entrada esperada por persona, para detectar llegadas tarde.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS schedules (
+    discord_id TEXT PRIMARY KEY,
+    display_name TEXT NOT NULL,
+    start_time TEXT NOT NULL,           -- 'HH:MM' en la zona TIMEZONE
+    grace_minutes INTEGER NOT NULL DEFAULT 10
+  );
+`);
+
 // Migración: vincular cada chatter con su usuario de Discord.
 const chatterCols = db.prepare("PRAGMA table_info(chatters)").all();
 if (!chatterCols.some((c) => c.name === "discord_id")) {

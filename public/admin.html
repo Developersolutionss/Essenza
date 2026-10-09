@@ -3,70 +3,82 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Essensa · Administración</title>
+  <meta name="color-scheme" content="dark" />
+  <title>Essensa · Panel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="ds.css" />
   <link rel="stylesheet" href="admin.css" />
 </head>
 <body>
-  <section id="login" class="login hidden">
-    <form id="loginForm" class="card login-card">
-      <h1>Essensa</h1>
-      <p class="muted">Panel de administración</p>
-      <input id="password" type="password" placeholder="Contraseña" autocomplete="current-password" required />
-      <button type="submit">Entrar</button>
-      <p id="loginError" class="error"></p>
+  <a class="skip-link" href="#view">Saltar al contenido</a>
+
+  <section id="login" class="login" hidden aria-labelledby="login-title">
+    <form id="loginForm" class="panel login-card" novalidate>
+      <div class="brand"><span class="mark" aria-hidden="true"></span>Essensa</div>
+      <h1 id="login-title" class="login-title">Panel de administración</h1>
+      <div class="field">
+        <label for="password">Contraseña</label>
+        <input id="password" type="password" autocomplete="current-password" required aria-describedby="loginError" />
+        <p id="loginError" class="field-error" role="alert"></p>
+      </div>
+      <button type="submit" class="btn primary">Entrar</button>
     </form>
   </section>
 
-  <main id="app" class="hidden">
-    <header class="top">
-      <div>
-        <h1>Administración</h1>
-        <p class="muted" id="updated"></p>
-      </div>
-      <div class="actions">
-        <label class="muted">Periodo
-          <select id="days">
-            <option value="1">Hoy</option>
-            <option value="7">7 días</option>
-            <option value="30" selected>30 días</option>
-            <option value="90">90 días</option>
-          </select>
-        </label>
-        <button id="logout" class="ghost">Salir</button>
-      </div>
+  <div id="app" class="shell" hidden>
+    <header class="mobile-top">
+      <div class="brand"><span class="mark" aria-hidden="true"></span>Essensa</div>
+      <button type="button" class="btn ghost sm js-logout">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
+        Salir
+      </button>
     </header>
 
-    <section class="kpis" id="kpis"></section>
-
-    <section class="grid">
-      <div class="card">
-        <h2>Voces más usadas</h2>
-        <p class="muted small">Ordenadas por caracteres generados con ElevenLabs en el periodo.</p>
-        <div id="voices"></div>
+    <aside class="side">
+      <div class="brand"><span class="mark" aria-hidden="true"></span>Essensa</div>
+      <nav id="nav" aria-label="Secciones">
+        <a href="#resumen" data-route="resumen">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+          <span>Resumen</span>
+        </a>
+        <a href="#fichajes" data-route="fichajes">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span>Fichajes</span>
+        </a>
+        <a href="#elevenlabs" data-route="elevenlabs">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 10v3"/><path d="M6 6v11"/><path d="M10 3v18"/><path d="M14 8v7"/><path d="M18 5v13"/><path d="M22 10v3"/></svg>
+          <span>ElevenLabs</span>
+        </a>
+        <a href="#horarios" data-route="horarios">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>
+          <span>Horarios</span>
+        </a>
+      </nav>
+      <div class="side-foot">
+        <div class="clock" id="clock" aria-hidden="true">--:--</div>
+        <div class="tz" id="tz"></div>
+        <button type="button" class="btn ghost sm js-logout">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
+          Cerrar sesión
+        </button>
       </div>
-      <div class="card">
-        <h2>Consumo por chatter</h2>
-        <div id="chatters"></div>
-      </div>
-    </section>
+    </aside>
 
-    <section class="card">
-      <h2>Consumo diario de caracteres</h2>
-      <div id="daily" class="daily"></div>
-    </section>
+    <main class="main" id="main">
+      <div class="statusbar" id="statusbar"></div>
+      <div id="view" aria-live="off"></div>
+    </main>
+  </div>
 
-    <section class="card">
-      <h2>Fichajes en vivo</h2>
-      <div id="open"></div>
-    </section>
+  <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+  <p class="sr-only" id="announce" role="status" aria-live="polite"></p>
 
-    <section class="card">
-      <h2>Historial de turnos</h2>
-      <p class="muted small">Un turno se marca si el break superó el límite o si sigue abierto.</p>
-      <div id="history"></div>
-    </section>
-  </main>
-
+  <script src="/vendor/chart.umd.js"></script>
   <script src="admin.js"></script>
 </body>
 </html>
