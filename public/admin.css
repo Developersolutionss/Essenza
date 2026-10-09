@@ -18,7 +18,7 @@
   transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
 }
 #nav a:hover { background: var(--surface-2); color: var(--fg); }
-#nav a[aria-current="page"] { background: var(--accent-soft); color: var(--fg); box-shadow: inset 3px 0 0 var(--accent); }
+#nav a[aria-current="page"] { background: var(--surface-2); color: var(--fg); box-shadow: inset 2px 0 0 var(--accent); }
 #nav a[aria-current="page"] .ic { color: var(--accent-ink); }
 .side-foot { margin-top: auto; display: grid; gap: var(--sp-1); padding: 0 var(--sp-2); }
 .clock { font: 500 1.625rem var(--font-data); letter-spacing: -0.04em; }
@@ -63,7 +63,7 @@
 /* ---------- Indicadores ---------- */
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: var(--sp-3); margin-bottom: var(--sp-3); }
 .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--sp-3) var(--sp-4); }
-.kpi.attn { border-color: var(--danger-line); background: linear-gradient(180deg, var(--danger-soft), var(--surface)); }
+.kpi.attn { border-color: var(--danger-line); }
 .kpi .k { display: flex; align-items: center; gap: 6px; color: var(--fg-muted); font-size: var(--fs-xs); font-weight: 500; }
 .kpi.attn .k { color: var(--danger-text); }
 .kpi .v { font: 500 var(--fs-xl) var(--font-data); letter-spacing: -0.04em; line-height: 1.15; margin: 6px 0 2px; }

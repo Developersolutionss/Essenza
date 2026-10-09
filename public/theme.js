@@ -23,7 +23,7 @@
   function paint(theme, announce) {
     root.setAttribute("data-theme", theme);
     var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", theme === "dark" ? "#14110a" : "#facc15");
+    if (meta) meta.setAttribute("content", theme === "dark" ? "#141311" : "#faf8f4");
     var scheme = document.querySelector('meta[name="color-scheme"]');
     if (scheme) scheme.setAttribute("content", theme);
     document.querySelectorAll("[data-theme-toggle]").forEach(function (b) {

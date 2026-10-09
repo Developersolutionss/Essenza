@@ -1,66 +1,67 @@
 /* ==========================================================================
    Essensa · Sistema de diseño compartido
-   Estilo: panel denso en datos (oscuro). Paleta azul pizarra con acento verde.
-   Tipografía: Fira Code para datos y títulos, Fira Sans para texto.
-   Contraste verificado: texto >= 4.5:1, bordes de controles >= 3:1.
+   Estilo sobrio: superficies neutras cálidas, un amarillo mostaza apagado como
+   único acento y estados en tonos tranquilos. Sin degradados, brillos ni
+   fondos teñidos. Tipografía: Fira Code para datos, Fira Sans para texto.
+   Contraste verificado en ambos modos: texto >= 4.5:1, bordes y barras >= 3:1.
    ========================================================================== */
 
 :root {
   color-scheme: light;
 
-  /* Superficies: blanco con un toque cálido */
-  --bg: #fffdf5;
+  /* Superficies: neutras cálidas, sin tinte amarillo */
+  --bg: #faf8f4;
   --surface: #ffffff;
-  --surface-2: #fff6cf;       /* amarillo pálido: hover, chips, filas destacadas */
-  --border: #efe4b8;          /* divisores */
-  --border-control: #8a7a3a;  /* bordes de controles (>= 3:1 sobre blanco) */
+  --surface-2: #f3efe6;
+  --border: #e4ddcd;          /* divisores */
+  --border-control: #8a7f66;  /* bordes de controles (>= 3:1) */
 
   /* Texto */
-  --fg: #1c1917;
-  --fg-2: #44403c;
-  --fg-muted: #6b5f2a;
+  --fg: #1f1c16;
+  --fg-2: #4a453b;
+  --fg-muted: #6e6656;
 
-  /* Marca: amarillo. El amarillo vivo solo se usa como relleno (con texto oscuro);
-     para texto e iconos sobre blanco se usa la versión oscura, que sí se lee. */
-  --accent: #facc15;
-  --accent-hover: #fde047;
-  --on-accent: #1c1917;
-  --accent-ink: #8a5a00;
-  --accent-soft: rgba(250, 204, 21, 0.24);
+  /* Marca: mostaza. Como relleno lleva texto oscuro encima; para texto e
+     iconos sobre fondo claro se usa su versión oscura, que sí se lee. */
+  --accent: #e9b949;
+  --accent-hover: #f0c562;
+  --on-accent: #1f1c16;
+  --accent-ink: #7a5a10;
+  --accent-soft: rgba(233, 185, 73, 0.16);
 
   /* Estados (nunca se usan solos: siempre llevan icono o texto) */
-  --good: #15803d;
-  --good-text: #166534;
-  --good-soft: rgba(22, 163, 74, 0.1);
-  --cost: #b8860b;            /* créditos gastados */
-  --warn-text: #92400e;
-  --warn-soft: rgba(217, 119, 6, 0.1);
-  --danger: #dc2626;
-  --danger-text: #b91c1c;
-  --danger-soft: rgba(220, 38, 38, 0.08);
-  --info: #57534e;
-  --ring: #1c1917;
+  --good: #3f7d52;
+  --good-text: #2f6b42;
+  --good-soft: transparent;
+  --cost: #a8842a;            /* créditos gastados */
+  --warn-text: #8a5a12;
+  --warn-soft: transparent;
+  --danger: #b4493c;
+  --danger-text: #a3402f;
+  --danger-soft: transparent;
+  --info: #7b7465;
+  --ring: #1f1c16;
 
-  /* Derivados (los usan componentes que no pueden llevar el color directo) */
-  --btn-hover: #fff0b3;
-  --row-hover: rgba(250, 204, 21, 0.12);
-  --good-line: rgba(22, 101, 52, 0.45);
-  --warn-line: rgba(146, 64, 14, 0.45);
-  --danger-line: rgba(185, 28, 28, 0.5);
-  --note-line: rgba(138, 90, 0, 0.45);
-  --shadow: 0 10px 30px rgba(60, 45, 0, 0.18);
+  /* Derivados */
+  --btn-hover: #ebe5d8;
+  --row-hover: #f7f4ed;
+  --good-line: var(--border-control);
+  --warn-line: var(--border-control);
+  --danger-line: #c9857a;
+  --note-line: var(--border);
+  --shadow: 0 6px 20px rgba(31, 28, 22, 0.12);
 
   /* Gráficas */
-  --c-cost: #b8860b;
-  --c-saved: #15803d;
-  --c-danger: #dc2626;
-  --c-info: #57534e;
-  --c-fg: #1c1917;
-  --c-muted: #6b5f2a;
-  --c-grid: rgba(138, 122, 58, 0.22);
-  --c-track: #f3ebc8;
-  --c-tip-bg: #1c1917;
-  --c-tip-fg: #fef3c7;
+  --c-cost: #a8842a;
+  --c-saved: #3f7d52;
+  --c-danger: #b4493c;
+  --c-info: #7b7465;
+  --c-fg: #1f1c16;
+  --c-muted: #6e6656;
+  --c-grid: rgba(110, 102, 86, 0.16);
+  --c-track: #ece6d8;
+  --c-tip-bg: #1f1c16;
+  --c-tip-fg: #f3efe6;
   /* Tipografía */
   --font-data: "Fira Code", ui-monospace, "Cascadia Code", Consolas, monospace;
   --font-text: "Fira Sans", "Segoe UI", system-ui, sans-serif;
@@ -88,53 +89,55 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --bg: #14110a;
-  --surface: #1f1b10;
-  --surface-2: #2d2711;
-  --border: #3a3318;
-  --border-control: #8f8043;
+  /* Carbón neutro cálido (no marrón ni amarillento) y mostaza apagada */
+  --bg: #141311;
+  --surface: #1c1a17;
+  --surface-2: #25231f;
+  --border: #33302a;
+  --border-control: #7d7564;
 
-  --fg: #fafaf5;
-  --fg-2: #d6d0b8;
-  --fg-muted: #a89f7c;
+  --fg: #ece7dc;
+  --fg-2: #c6c0b2;
+  --fg-muted: #9b9483;
 
-  --accent: #facc15;
-  --accent-hover: #fde047;
-  --on-accent: #1c1917;
-  --accent-ink: #facc15;
-  --accent-soft: rgba(250, 204, 21, 0.18);
+  --accent: #cfa441;
+  --accent-hover: #d9b35a;
+  --on-accent: #17150f;
+  --accent-ink: #d8b354;
+  --accent-soft: rgba(207, 164, 65, 0.12);
 
-  --good: #22c55e;
-  --good-text: #4ade80;
-  --good-soft: rgba(34, 197, 94, 0.14);
-  --cost: #facc15;
-  --warn-text: #fbbf24;
-  --warn-soft: rgba(251, 191, 36, 0.12);
-  --danger: #ef4444;
-  --danger-text: #f87171;
-  --danger-soft: rgba(239, 68, 68, 0.14);
-  --info: #a8a29e;
-  --ring: #ffffff;
+  --good: #8cbf98;
+  --good-text: #8cbf98;
+  --good-soft: transparent;
+  --cost: #cfa441;
+  --warn-text: #d9ad5c;
+  --warn-soft: transparent;
+  --danger: #e08a7d;
+  --danger-text: #e08a7d;
+  --danger-soft: transparent;
+  --info: #a39d8f;
+  --ring: #ece7dc;
 
-  --btn-hover: #3a3216;
-  --row-hover: rgba(250, 204, 21, 0.08);
-  --good-line: rgba(74, 222, 128, 0.5);
-  --warn-line: rgba(251, 191, 36, 0.5);
-  --danger-line: rgba(248, 113, 113, 0.55);
-  --note-line: rgba(250, 204, 21, 0.4);
-  --shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+  --btn-hover: #2c2925;
+  --row-hover: #211f1b;
+  --good-line: var(--border-control);
+  --warn-line: var(--border-control);
+  --danger-line: #8a5a52;
+  --note-line: var(--border);
+  --shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
 
-  --c-cost: #facc15;
-  --c-saved: #4ade80;
-  --c-danger: #f87171;
-  --c-info: #a8a29e;
-  --c-fg: #fafaf5;
-  --c-muted: #a89f7c;
-  --c-grid: rgba(168, 159, 124, 0.2);
-  --c-track: #2d2711;
-  --c-tip-bg: #fafaf5;
-  --c-tip-fg: #1c1917;
-}@media (pointer: coarse) { :root { --tap: 44px; } }
+  --c-cost: #cfa441;
+  --c-saved: #7fae8a;
+  --c-danger: #d98073;
+  --c-info: #8f897c;
+  --c-fg: #ece7dc;
+  --c-muted: #9b9483;
+  --c-grid: rgba(155, 148, 131, 0.14);
+  --c-track: #2a2722;
+  --c-tip-bg: #ece7dc;
+  --c-tip-fg: #1c1a17;
+}
+@media (pointer: coarse) { :root { --tap: 44px; } }
 
 *, *::before, *::after { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -221,7 +224,7 @@ input.mono { font-family: var(--font-data); }
 /* ---------- Estados (siempre icono + texto) ---------- */
 .pill {
   display: inline-flex; align-items: center; gap: 6px;
-  font: 500 var(--fs-xs) var(--font-data); padding: 2px 10px; border-radius: 99px;
+  font: 500 var(--fs-xs) var(--font-text); padding: 2px 10px; border-radius: 99px;
   border: 1px solid var(--border-control); color: var(--fg-2); background: transparent; white-space: nowrap;
 }
 .pill .ic { width: 14px; height: 14px; }
@@ -257,7 +260,7 @@ th[aria-sort="descending"] .th-btn .ic { transform: rotate(180deg); }
 .empty { display: flex; gap: var(--sp-3); align-items: center; flex-wrap: wrap; color: var(--fg-muted); padding: var(--sp-3) 2px; }
 .empty .ic { color: var(--fg-muted); }
 .empty.ok .ic { color: var(--good); }
-.note { display: flex; gap: var(--sp-3); align-items: center; flex-wrap: wrap; padding: var(--sp-3) var(--sp-4); border-radius: var(--radius-sm); background: var(--surface-2); border: 1px solid var(--note-line); color: var(--fg-2); }
+.note { display: flex; gap: var(--sp-3); align-items: center; flex-wrap: wrap; padding: var(--sp-3) var(--sp-4); border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--note-line); border-left: 3px solid var(--accent); color: var(--fg-2); }
 .note .ic { color: var(--accent-ink); flex: none; }
 .note > span { flex: 1 1 260px; min-width: 0; }
 .note a { color: var(--accent-ink); font-weight: 600; }
@@ -268,8 +271,8 @@ th[aria-sort="descending"] .th-btn .ic { transform: rotate(180deg); }
 .toast.ok .ic { color: var(--good); }
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
-.skeleton { border-radius: var(--radius); background: linear-gradient(90deg, var(--surface), var(--surface-2), var(--surface)); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
-@keyframes shimmer { to { background-position: -200% 0; } }
+.skeleton { border-radius: var(--radius); background: var(--surface-2); animation: shimmer 1.4s ease-in-out infinite; }
+@keyframes shimmer { 50% { opacity: 0.55; } }
 
 /* ---------- Logo ---------- */
 .logo { display: block; height: 30px; width: auto; flex: none; object-fit: contain; }

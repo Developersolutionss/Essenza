@@ -372,24 +372,8 @@ function dailyChart(id, daily) {
   );
 }
 
-// Relleno con degradado vertical suave (de más claro abajo a pleno arriba).
-// Si el color no es un hex (por ejemplo una trama), se deja tal cual.
-function gradientFill(color) {
-  if (typeof color !== "string" || !/^#[0-9a-f]{6}$/i.test(color)) return color;
-  const rgb = hexToRgb(color);
-  return (ctx) => {
-    const { chart } = ctx;
-    const area = chart.chartArea;
-    if (!area) return color;
-    const g = chart.ctx.createLinearGradient(0, area.bottom, 0, area.top);
-    g.addColorStop(0, `rgba(${rgb},0.55)`);
-    g.addColorStop(1, `rgba(${rgb},1)`);
-    return g;
-  };
-}
-
-// Barras verticales: grosor máximo para que una sola barra no ocupe todo el ancho,
-// esquinas redondeadas arriba, valor encima y nombres recortados en el eje.
+// Barras verticales de color sólido: grosor máximo para que una sola barra no
+// ocupe todo el ancho, esquinas redondeadas arriba, valor encima y nombres recortados.
 function vbar(id, label, labels, datasets, legend = false) {
   mk(
     id,
@@ -404,8 +388,6 @@ function vbar(id, label, labels, datasets, legend = false) {
           categoryPercentage: 0.7,
           barPercentage: 0.85,
           ...d,
-          backgroundColor: gradientFill(d.backgroundColor),
-          hoverBackgroundColor: d.backgroundColor,
         })),
       },
       plugins: [valueLabels],
@@ -827,7 +809,7 @@ views.elevenlabs = {
           data: {
             labels,
             datasets: [
-              { label: "Acumulado", data: d.cumulative.map((x) => x.total), borderColor: COL.cost, backgroundColor: `rgba(${RGB.cost},.18)`, fill: true, tension: 0.25, pointRadius: 0, pointHoverRadius: 4 },
+              { label: "Acumulado", data: d.cumulative.map((x) => x.total), borderColor: COL.cost, backgroundColor: `rgba(${RGB.cost},.08)`, fill: true, tension: 0.25, pointRadius: 0, pointHoverRadius: 4 },
               { label: "Proyección", data: projected, borderColor: COL.info, borderDash: [6, 5], pointRadius: 0, pointHoverRadius: 4, spanGaps: true },
             ],
           },
