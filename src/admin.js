@@ -178,6 +178,8 @@ function enrichShifts(list) {
       endedAt: o.shift.ended_at,
       workedMs: o.workedMs,
       requiredMs: o.requiredMs,
+      isExtra: o.isExtra,
+      extraMs: o.extraMs,
       breakMs: o.breakMs,
       breakOverMs: o.breakOverMs,
       onBreak: o.onBreak,
@@ -330,11 +332,17 @@ router.get("/fichajes", requireAuth, (req, res) => {
         overCount: 0,
         overMs: 0,
         workedMs: 0,
+        extraMs: 0,
+        extraCount: 0,
       });
     }
     const p = people.get(s.discordId);
     p.shifts += 1;
     p.workedMs += s.workedMs;
+    if (s.isExtra) {
+      p.extraMs += s.extraMs;
+      p.extraCount += 1;
+    }
     if (s.late) {
       p.lateCount += 1;
       p.lateMs += s.lateMs;
@@ -347,7 +355,9 @@ router.get("/fichajes", requireAuth, (req, res) => {
 
   const late = all.filter((s) => s.late);
   const overruns = all.filter((s) => s.breakOverMs > 0);
-  const closed = all.filter((s) => s.endedAt);
+  // El promedio por turno no incluye las horas extra, que son fichajes sueltos y cortos.
+  const closed = all.filter((s) => s.endedAt && !s.isExtra);
+  const extras = all.filter((s) => s.isExtra);
 
   res.json({
     now,
@@ -362,7 +372,10 @@ router.get("/fichajes", requireAuth, (req, res) => {
       overCount: overruns.length,
       overMs: overruns.reduce((a, s) => a + s.breakOverMs, 0),
       avgWorkedMs: closed.length ? closed.reduce((a, s) => a + s.workedMs, 0) / closed.length : 0,
-      unscheduled: new Set(all.filter((s) => !s.scheduled).map((s) => s.discordId)).size,
+      unscheduled: new Set(all.filter((s) => !s.scheduled && !s.isExtra).map((s) => s.discordId)).size,
+      extraCount: extras.length,
+      extraMs: extras.reduce((a, s) => a + s.extraMs, 0),
+      extraPeople: new Set(extras.map((s) => s.discordId)).size,
     },
     open,
     late,

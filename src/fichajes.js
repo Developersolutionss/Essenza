@@ -96,27 +96,41 @@ function statusText(st) {
   return (
     `Turno desde ${ts(st.shift.started_at)}` +
     (st.shift.template_name ? ` (${st.shift.template_name})` : "") +
+    (st.isExtra ? " · **horas extra**" : "") +
     `.\n` +
-    `Trabajado: **${fmt(st.workedMs)}** de ${fmt(st.requiredMs)}.\n` +
+    (st.isExtra
+      ? `Llevas **${fmt(st.workedMs)}** de horas extra.\n`
+      : `Trabajado: **${fmt(st.workedMs)}** de ${fmt(st.requiredMs)}.\n`) +
     `Break: **${fmt(st.breakMs)}** de ${fmt(shifts.BREAK_MS)}` +
     (st.onBreak ? " (estás en break ahora)" : "") +
     (st.breakOverMs ? `\n⚠️ Exceso de break: **${fmt(st.breakOverMs)}**.` : "") +
     (st.canEnd
-      ? "\n✅ Ya puedes pulsar **End**."
+      ? st.isExtra
+        ? "\n✅ Pulsa **End** cuando termines."
+        : "\n✅ Ya puedes pulsar **End**."
       : st.onBreak
       ? ""
       : `\nPodrás terminar a partir de ${ts(Date.now() + st.remainingMs)}.`)
   );
 }
 
-// `names`: textos de la persona donde buscar su turno (apodo del servidor, nombre, roles).
-function runAction(action, discordId, name, names = []) {
+// `names`: apodo del servidor y nombre global. `roleNames`: roles de Discord (Shift 1, 2, 3).
+// `now` solo lo cambian las pruebas, para no depender de la hora a la que se ejecutan.
+function runAction(action, discordId, name, names = [], roleNames = [], now = Date.now()) {
   switch (action) {
     case "start": {
-      const now = Date.now();
-      const plan = plans.resolveForStart({ discordId, names, startedAt: now });
+      const plan = plans.resolveForStart({ discordId, names, roleNames, startedAt: now });
       const r = shifts.startShift(discordId, name, now, plan);
       if (!r.ok) return `❌ Ya tienes un turno abierto desde ${ts(r.shift?.started_at ?? Date.now())}.`;
+
+      // Fuera de su turno: todo el tiempo cuenta como horas extra y se puede terminar cuando se quiera.
+      if (plan?.isExtra) {
+        return (
+          `✅ Turno iniciado a las ${ts(r.shift.started_at)}.\n` +
+          `⏱️ Tu **${plan.templateName}** terminó a las ${ts(plan.shiftEndedAt)}, así que este tiempo cuenta como ` +
+          `**horas extra**. No se mide puntualidad y puedes pulsar **End** cuando termines.`
+        );
+      }
 
       const requiredMs = shifts.statusOf(discordId, now)?.requiredMs ?? shifts.SHIFT_MS;
       let msg =
@@ -144,7 +158,7 @@ function runAction(action, discordId, name, names = []) {
     }
 
     case "break": {
-      const r = shifts.startBreak(discordId);
+      const r = shifts.startBreak(discordId, now);
       if (!r.ok) {
         if (r.reason === "no_shift") return "❌ No tienes un turno abierto. Pulsa **Start** primero.";
         if (r.reason === "break_used") return "❌ Ya usaste tu break de este turno. Solo se permite uno por turno.";
@@ -156,7 +170,7 @@ function runAction(action, discordId, name, names = []) {
       return `☕ Break iniciado. Te quedan **${fmt(r.remainingBreakMs)}**; vuelve antes de ${ts(Date.now() + r.remainingBreakMs)} y pulsa **Resume**.`;
     }
     case "resume": {
-      const r = shifts.endBreak(discordId);
+      const r = shifts.endBreak(discordId, now);
       if (!r.ok) {
         return r.reason === "no_shift"
           ? "❌ No tienes un turno abierto."
@@ -167,7 +181,7 @@ function runAction(action, discordId, name, names = []) {
         : `▶️ De vuelta al trabajo. Ese era tu único break de este turno.`;
     }
     case "end": {
-      const r = shifts.endShift(discordId);
+      const r = shifts.endShift(discordId, now);
       if (!r.ok) {
         if (r.reason === "no_shift") return "❌ No tienes un turno abierto.";
         if (r.reason === "on_break") return "❌ Estás en break. Pulsa **Resume** y luego **End**.";
@@ -176,11 +190,13 @@ function runAction(action, discordId, name, names = []) {
           `te faltan **${fmt(r.st.remainingMs)}** (a partir de ${ts(Date.now() + r.st.remainingMs)}).`
         );
       }
-      return `🏁 Turno terminado. Trabajado: **${fmt(r.workedMs)}**. Break: **${fmt(r.breakMs)}**` +
+      return `🏁 ${r.isExtra ? "Horas extra terminadas" : "Turno terminado"}. Trabajado: **${fmt(r.workedMs)}**` +
+        (r.isExtra ? " (todo cuenta como horas extra)" : "") +
+        `. Break: **${fmt(r.breakMs)}**` +
         (r.breakOverMs ? ` (exceso ${fmt(r.breakOverMs)})` : "") + ".";
     }
     case "status": {
-      const st = shifts.statusOf(discordId);
+      const st = shifts.statusOf(discordId, now);
       return st ? statusText(st) : "No tienes un turno abierto. Pulsa **Start** para empezar.";
     }
     default:
@@ -191,13 +207,13 @@ function runAction(action, discordId, name, names = []) {
 async function handleShiftButton(interaction) {
   const action = interaction.customId.split(":")[1];
   const name = interaction.member?.displayName || interaction.user.globalName || interaction.user.username;
-  // El turno sale del apodo del servidor ("Ana - Shift 2 (Chatter)"); si no está
-  // ahí, se prueba con el nombre global y con los roles.
+  // El turno sale primero del rol de Discord (Shift 1, 2 o 3); si no tiene, del apodo
+  // del servidor ("Ana - Shift 2 (Chatter)") o del nombre global.
   const roleNames = interaction.member?.roles?.cache
     ? [...interaction.member.roles.cache.values()].map((r) => r.name)
     : [];
-  const names = [name, interaction.user.globalName, ...roleNames];
-  const text = runAction(action, interaction.user.id, name, names);
+  const names = [name, interaction.user.globalName];
+  const text = runAction(action, interaction.user.id, name, names, roleNames);
 
   // La acción ya quedó guardada en la base: pase lo que pase con el panel del
   // canal, la persona tiene que recibir su confirmación.

@@ -145,6 +145,8 @@ if (!shiftCols.includes("grace_minutes")) db.exec("ALTER TABLE shifts ADD COLUMN
 if (!shiftCols.includes("plan_source")) db.exec("ALTER TABLE shifts ADD COLUMN plan_source TEXT;"); // personal | apodo | hora | exento
 // Minutos de turno exigidos para poder pulsar End, fijados al iniciar el fichaje.
 if (!shiftCols.includes("required_minutes")) db.exec("ALTER TABLE shifts ADD COLUMN required_minutes INTEGER;");
+// 1 = fichaje fuera de su turno: todo el tiempo cuenta como horas extra.
+if (!shiftCols.includes("is_extra")) db.exec("ALTER TABLE shifts ADD COLUMN is_extra INTEGER NOT NULL DEFAULT 0;");
 
 // Cada turno tiene su propia duración (en minutos). Sin valor se usa SHIFT_HOURS.
 const tplCols = db.prepare("PRAGMA table_info(shift_templates)").all().map((c) => c.name);

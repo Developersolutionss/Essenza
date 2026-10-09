@@ -14,8 +14,9 @@ function breaksOf(shiftId) {
 
 // Duración exigida para pulsar End: la de su turno (guardada al iniciar) o, si no
 // tiene turno, la general de SHIFT_HOURS.
+// 0 minutos = horas extra: no hay mínimo, se puede terminar cuando se quiera.
 function requiredOf(shift) {
-  return shift.required_minutes ? shift.required_minutes * 60000 : SHIFT_MS;
+  return shift.required_minutes != null ? shift.required_minutes * 60000 : SHIFT_MS;
 }
 
 // Resume un turno. El break permitido (BREAK_MINUTES) es tiempo pagado y cuenta
@@ -31,8 +32,11 @@ function summarize(shift, breaks, now = Date.now()) {
   const breakOverMs = Math.max(0, breakMs - BREAK_MS);
   const workedMs = Math.max(0, end - shift.started_at - breakOverMs);
   const requiredMs = requiredOf(shift);
+  const isExtra = Boolean(shift.is_extra);
   return {
     workedMs,
+    isExtra,
+    extraMs: isExtra ? workedMs : 0,
     requiredMs,
     breakMs,
     breakOverMs,
@@ -59,8 +63,8 @@ function startShift(discordId, name, now = Date.now(), plan = null) {
   try {
     const info = db
       .prepare(
-        `INSERT INTO shifts (discord_id, discord_name, started_at, template_name, expected_at, grace_minutes, plan_source, required_minutes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO shifts (discord_id, discord_name, started_at, template_name, expected_at, grace_minutes, plan_source, required_minutes, is_extra)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         discordId,
@@ -70,7 +74,8 @@ function startShift(discordId, name, now = Date.now(), plan = null) {
         plan?.expectedAt ?? null,
         plan?.graceMin ?? null,
         plan?.source ?? null,
-        plan?.durationMin ?? null
+        plan?.durationMin ?? null,
+        plan?.isExtra ? 1 : 0
       );
     return { ok: true, shift: db.prepare("SELECT * FROM shifts WHERE id = ?").get(info.lastInsertRowid) };
   } catch {

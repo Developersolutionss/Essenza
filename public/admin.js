@@ -519,6 +519,7 @@ function statusPills(s) {
   const out = [];
   if (s.onBreak) out.push(s.breakOverMs > 0 ? pill("bad", "alert", "Break excedido") : pill("warn", "coffee", "En break"));
   else out.push(pill("good", "check", "Trabajando"));
+  if (s.isExtra) out.push(pill("warn", "clock", "Hora extra"));
   if (s.late) out.push(pill("bad", "clock", `Tarde +${fmtDur(s.lateMs)}`));
   return out.join(" ");
 }
@@ -534,7 +535,7 @@ function openTable(id, open, rules, compact = false) {
     if (!compact) r.push({ h: `<span class="mono">${fmtTime(s.startedAt)}</span>`, v: s.startedAt });
     r.push(statusPills(s));
     // El break permitido cuenta como trabajado: el contador solo se detiene al pasarse.
-    r.push({ h: tick(s.workedMs, !s.onBreak || s.breakMs < rules.breakMs) + (compact ? "" : ` <span class="dim">/ ${fmtDur(s.requiredMs || rules.shiftMs)}</span>`), v: s.workedMs });
+    r.push({ h: tick(s.workedMs, !s.onBreak || s.breakMs < rules.breakMs) + (compact ? "" : s.isExtra ? ' <span class="dim">· extra</span>' : ` <span class="dim">/ ${fmtDur(s.requiredMs ?? rules.shiftMs)}</span>`), v: s.workedMs });
     r.push({ h: tick(s.breakMs, s.onBreak, rules.breakMs) + (compact ? "" : ` <span class="dim">/ ${fmtDur(rules.breakMs)}</span>`), v: s.breakMs });
     if (!compact) {
       r.push(
@@ -623,7 +624,7 @@ views.fichajes = {
       : empty(k.shifts ? "Nadie se pasó del break." : "Sin turnos en este periodo.", { ok: k.shifts > 0 });
 
     const peopleTbl = d.people.length
-      ? table("people", "Resumen por persona", [{ h: "Persona", sort: "text" }, { h: "Turnos", num: true, sort: "num" }, { h: "Tardes", num: true, sort: "num" }, { h: "Min. tarde", num: true, sort: "num" }, { h: "Excesos", num: true, sort: "num" }, { h: "Min. exceso", num: true, sort: "num" }, { h: "Trabajado", num: true, sort: "num" }],
+      ? table("people", "Resumen por persona", [{ h: "Persona", sort: "text" }, { h: "Turnos", num: true, sort: "num" }, { h: "Tardes", num: true, sort: "num" }, { h: "Min. tarde", num: true, sort: "num" }, { h: "Excesos", num: true, sort: "num" }, { h: "Min. exceso", num: true, sort: "num" }, { h: "Horas extra", num: true, sort: "num" }, { h: "Trabajado", num: true, sort: "num" }],
           d.people.map((p) => [
             { h: `<span class="who">${esc(p.name)}</span>`, v: p.name },
             p.shifts,
@@ -631,6 +632,7 @@ views.fichajes = {
             { h: p.lateCount ? fmtDur(p.lateMs) : "—", v: p.lateMs },
             { h: p.overCount ? pill("bad", null, String(p.overCount)) : '<span class="dim">0</span>', v: p.overCount },
             { h: p.overCount ? fmtDur(p.overMs) : "—", v: p.overMs },
+            { h: p.extraMs ? fmtDur(p.extraMs) : "—", v: p.extraMs },
             { h: fmtDur(p.workedMs), v: p.workedMs },
           ]))
       : empty("Sin datos.");
@@ -641,6 +643,7 @@ views.fichajes = {
             const marks = [];
             if (s.late) marks.push(pill("bad", "clock", `Tarde +${fmtDur(s.lateMs)}`));
             if (s.breakOverMs) marks.push(pill("bad", "coffee", `Break +${fmtDur(s.breakOverMs)}`));
+            if (s.isExtra) marks.push(pill("warn", "clock", "Hora extra"));
             if (s.planSource === "exento") marks.push(pill("", null, "Sin medir"));
             if (!s.endedAt) marks.push(pill("warn", "clock", "Abierto"));
             return [
@@ -661,7 +664,8 @@ views.fichajes = {
         ${kpi("users", "Turnos", nf.format(k.shifts), `${k.people} personas`)}
         ${kpi("clock", "Llegadas tarde", nf.format(k.lateCount), k.lateCount ? `${fmtDur(k.lateMs)} acumulados` : "puntualidad perfecta", { alert: k.lateCount > 0 })}
         ${kpi("coffee", "Excesos de break", nf.format(k.overCount), k.overCount ? `${fmtDur(k.overMs)} acumulados` : "ninguno", { alert: k.overCount > 0 })}
-        ${kpi("check", "Trabajo promedio", k.avgWorkedMs ? fmtDur(k.avgWorkedMs) : "—", "por turno cerrado")}
+        ${kpi("check", "Trabajo promedio", k.avgWorkedMs ? fmtDur(k.avgWorkedMs) : "—", "por turno cerrado, sin horas extra")}
+        ${kpi("clock", "Horas extra", k.extraMs ? fmtDur(k.extraMs) : "0 min", k.extraCount ? `${k.extraCount} fichaje(s) de ${k.extraPeople} persona(s)` : "nadie fichó fuera de su turno")}
       </div>
       <section class="panel section" aria-labelledby="h-live"><div class="head"><h2 id="h-live">En vivo</h2></div><p class="sub">Turnos abiertos ahora mismo</p>${openTable("open-f", d.open, d.rules)}</section>
       <div class="grid">
@@ -990,7 +994,7 @@ views.horarios = {
     const html = `
       ${head("Horarios", `Hora de entrada esperada · ${esc(d.tzLabel)} (<b class="mono">${esc(d.tz)}</b>)`)}
 
-      <div class="note section">${ic("info")}<span>Nadie se configura uno por uno. Al pulsar <b>Start</b> el bot decide el turno, por este orden: <b>1)</b> su horario personal, si lo tiene; <b>2)</b> el turno escrito en su apodo del servidor (por ejemplo <b>Alejandro - Shift 2</b>); <b>3)</b> si su cargo es Team Leader, Jefe de Chat o Content Manager, no se mide la puntualidad y cumple una jornada de <b>10 horas</b>; <b>4)</b> si nada de lo anterior, <b>por la hora a la que ficha</b>: el turno cuyo inicio queda más cerca. Con la hora sola, un retraso de más de 4 horas se confunde con llegar antes al turno siguiente: para esos casos conviene el turno en el apodo.</span></div>
+      <div class="note section">${ic("info")}<span>Nadie se configura uno por uno. Al pulsar <b>Start</b> el bot decide el turno, por este orden: <b>1)</b> su horario personal, si lo tiene; <b>2)</b> su <b>rol de Discord</b> <b>Shift 1</b>, <b>Shift 2</b> o <b>Shift 3</b> (el recomendado); <b>3)</b> el turno escrito en su apodo (por ejemplo <b>Alejandro - Shift 2</b>); <b>4)</b> si su cargo es Team Leader, Jefe de Chat o Content Manager, no se mide la puntualidad y cumple una jornada de <b>10 horas</b>; <b>5)</b> si nada de lo anterior, <b>por la hora a la que ficha</b>. Quien tiene rol o apodo de turno y ficha <b>después de que su turno terminó</b> acumula <b>horas extra</b>: no se mide puntualidad y puede terminar cuando quiera. Esto solo se detecta con rol o apodo; con la hora sola no hay forma de saberlo.</span></div>
 
       <section class="panel section" aria-labelledby="h-tpl"><div class="head"><h2 id="h-tpl">Turnos</h2></div>
         <p class="sub">La puntualidad se mide frente a la entrada, más los minutos de gracia. <b>End</b> se habilita al cumplir la duración del turno, contada desde que la persona pulsa Start (el break permitido cuenta). Cambiar un turno no modifica los fichajes ya iniciados.</p>

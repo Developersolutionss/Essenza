@@ -124,18 +124,35 @@ a quien ya está en turno.
 Nadie se configura uno por uno. Al pulsar **Start**, el bot decide el turno por este orden:
 
 1. **Horario personal** (Horarios, Excepciones), si la persona lo tiene.
-2. **Turno escrito en el apodo del servidor**, por ejemplo `Alejandro - Shift 2 (Chatter)`.
-   Valen variantes como `shift2` o `SHIFT-2`; si el apodo no lo trae, se prueba con el
-   nombre global y con los roles. Detecta retrasos de cualquier tamaño.
-3. **Cargo directivo**: Team Leader, Jefe de Chat y Content Manager (`EXEMPT_ROLES`) no siguen
+2. **Rol de Discord `Shift 1`, `Shift 2` o `Shift 3`** (el método recomendado). El nombre del
+   rol puede llevar emojis o letras decorativas y texto extra, por ejemplo `⏰ Shift 2 (Chatter)`.
+3. **Turno escrito en el apodo del servidor**, por ejemplo `Alejandro - Shift 2 (Chatter)`.
+   Valen variantes como `shift2` o `SHIFT-2`. Si la persona tiene rol, el rol manda sobre el apodo.
+4. **Cargo directivo**: Team Leader, Jefe de Chat y Content Manager (`EXEMPT_ROLES`) no siguen
    un turno fijo: no se miden en puntualidad y cumplen **10 horas** (`EXEMPT_HOURS`). Un
-   Shift en el apodo o un horario personal tiene prioridad sobre esta regla.
-4. **Por la hora de Start**: se toma el turno cuyo inicio queda más cerca. No hace falta tocar
-   ningún nombre. Límite: con turnos separados unas 8 h, un retraso de más de unas 4 h se lee como
-   haber llegado antes al turno siguiente; para esos casos conviene el turno en el apodo.
+   Shift (rol o apodo) o un horario personal tiene prioridad sobre esta regla.
+5. **Por la hora de Start**: se toma el turno cuyo inicio queda más cerca. No hace falta tocar
+   nada. Límite: con turnos separados unas 8 h, un retraso de más de unas 4 h se lee como
+   haber llegado antes al turno siguiente, y no se pueden detectar las horas extra.
 
 El bot responde a quien ficha con su turno, de cuál de los métodos salió y si llegó a tiempo
 o tarde.
+
+### Horas extra
+
+Quien tiene un turno por **rol o apodo** y pulsa Start **después de que ese turno terminó**
+ficha horas extra: todo ese fichaje cuenta como horas extra.
+
+- No se mide puntualidad y no hay duración mínima: se puede pulsar End cuando se termine.
+- Vale para un segundo fichaje del mismo día (el Shift 1 que ya cerró su turno a las 13:00 y
+  vuelve a las 14:00) y para quien ficha en horas que no son suyas.
+- Fichar *dentro* de la ventana de su turno, aunque sea con mucho retraso, no es hora extra:
+  es una llegada tarde y exige la duración del turno. Solo es extra cuando el turno ya había
+  terminado.
+- El panel las suma aparte (tarjeta "Horas extra" en Fichajes, columna por persona y marca en
+  el historial) y no las incluye en el promedio por turno.
+- El break se rige por la misma regla: 30 min cuentan, el exceso se descuenta.
+- Con horario personal, cargo directivo o turno deducido por la hora no se detectan horas extra.
 
 **Cada uno ficha en su zona.** La puntualidad se mide siempre contra la hora de Venezuela, sin
 importar desde dónde se ficha ni la zona del computador. Para que nadie se confunda, el bot

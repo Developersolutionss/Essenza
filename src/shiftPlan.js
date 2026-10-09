@@ -5,13 +5,19 @@ const tzu = require("./timezone");
 //
 // Orden de prioridad:
 //   1. Horario personal (tabla schedules): para quien no sigue su turno.
-//   2. Apodo del servidor con el turno escrito ("Alejandro - Shift 2 (Chatter)"),
-//      o un rol con ese nombre. Detecta retrasos de cualquier tamaño.
-//   3. Cargo directivo (Team Leader, Jefe de Chat...): no se mide la puntualidad y
+//   2. Rol de Discord con el turno (Shift 1, Shift 2, Shift 3). Es el método
+//      recomendado: además de medir la puntualidad, permite saber cuándo alguien
+//      ficha FUERA de su turno (ver "horas extra" abajo).
+//   3. Turno escrito en el apodo ("Alejandro - Shift 2 (Chatter)"). Misma lógica.
+//   4. Cargo directivo (Team Leader, Jefe de Chat...): no se mide la puntualidad y
 //      cumple 10 h (EXEMPT_HOURS) en lugar de la duración de un turno.
-//   4. Por la hora de Start: se toma el inicio de turno más cercano. Funciona sin
-//      tocar nombres, pero con turnos separados 8 h un retraso de más de 4 h se
-//      confunde con llegar antes al turno siguiente.
+//   5. Por la hora de Start: se toma el inicio de turno más cercano. Funciona sin
+//      tocar nada, pero con turnos separados 8 h un retraso de más de 4 h se
+//      confunde con llegar antes al turno siguiente, y no puede detectar horas extra.
+//
+// Horas extra: si la persona tiene un turno (rol o apodo) y pulsa Start DESPUÉS de que
+// ese turno terminó, todo el fichaje cuenta como horas extra. No se mide puntualidad,
+// no exige una duración mínima y se suma aparte en el panel.
 //
 // La hora esperada se guarda en el propio fichaje: si luego se cambia el turno de
 // la persona o la hora del turno, el historial no se reescribe.
@@ -42,9 +48,10 @@ function normalize(s) {
 // Los apodos los escribe la gente a mano: "Shift 2", "shift2", "SHIFT-2" y
 // "Shift_2" valen igual. El número debe quedar completo: "Shift 1" no coincide
 // con "Shift 10". Las letras sueltas antes ("Reshift 1") tampoco cuentan.
+// NFKC convierte las letras y cifras decorativas de los roles ("𝗦𝗵𝗶𝗳𝘁 𝟭") en normales.
 function nameMatches(text, templateName) {
   const flexible = escapeRegex(templateName.trim().toLowerCase()).replace(/\s+/g, "[\\s_-]*");
-  return new RegExp(`(?<![a-z0-9])${flexible}(?!\\d)`).test(String(text || "").toLowerCase());
+  return new RegExp(`(?<![a-z0-9])${flexible}(?!\\d)`).test(String(text || "").normalize("NFKC").toLowerCase());
 }
 
 // Cargos que no siguen un turno fijo y por tanto no se miden en puntualidad.
@@ -67,23 +74,45 @@ function tzLabel(tz = tzu.getTz()) {
   return tz === "America/Caracas" ? "hora de Venezuela" : tz;
 }
 
+const defaultShiftMinutes = () => Math.round(Number(process.env.SHIFT_HOURS || 8) * 60);
+
 function planFor(template, source, startedAt) {
-  return {
+  const expectedAt = tzu.expectedStart(startedAt, template.startTime);
+  const plan = {
     source,
     templateName: template.name,
     startTime: template.startTime,
     graceMin: template.graceMin,
     durationMin: template.durationMin || null,
-    expectedAt: tzu.expectedStart(startedAt, template.startTime),
+    expectedAt,
+    isExtra: false,
   };
+  // Solo se puede saber que alguien ficha fuera de su turno si el turno es conocido
+  // (rol o apodo); deducido por la hora no hay forma de saberlo.
+  if (source === "rol" || source === "apodo") {
+    const endsAt = expectedAt + (template.durationMin || defaultShiftMinutes()) * 60000;
+    if (startedAt > endsAt) {
+      return { ...plan, expectedAt: null, graceMin: null, durationMin: 0, isExtra: true, shiftEndedAt: endsAt };
+    }
+  }
+  return plan;
+}
+
+// El turno más cercano a la llegada entre varios candidatos.
+function nearest(options, startedAt) {
+  const dist = (o) => Math.abs(startedAt - (o.expectedAt ?? o.shiftEndedAt));
+  return [...options].sort((a, b) => dist(a) - dist(b))[0];
 }
 
 // Devuelve el plan de esta persona para un fichaje que empieza en `startedAt`:
-//   { source: "personal" | "apodo" | "hora" | "exento", templateName, startTime, graceMin, durationMin, expectedAt }
-// durationMin null = se exige la duración general (SHIFT_HOURS).
-// "exento" no trae hora esperada. Devuelve null si no hay forma de medir (menos de
-// dos turnos definidos y sin apodo).
-function resolveForStart({ discordId, names = [], startedAt }) {
+//   { source: "personal" | "rol" | "apodo" | "hora" | "exento", templateName, startTime,
+//     graceMin, durationMin, expectedAt, isExtra }
+// durationMin null = se exige la duración general (SHIFT_HOURS); 0 = horas extra, sin mínimo.
+// "exento" y las horas extra no traen hora esperada. Devuelve null si no hay forma de
+// medir (menos de dos turnos definidos y sin rol ni apodo).
+//   roleNames: nombres de los roles de Discord de la persona
+//   names: apodo del servidor y nombre global
+function resolveForStart({ discordId, names = [], roleNames = [], startedAt }) {
   const personal = db.prepare("SELECT * FROM schedules WHERE discord_id = ?").get(discordId);
   if (personal) {
     return {
@@ -95,28 +124,28 @@ function resolveForStart({ discordId, names = [], startedAt }) {
     };
   }
 
-  const texts = names.filter(Boolean);
+  const roles = roleNames.filter(Boolean);
+  const nicks = names.filter(Boolean);
+  const texts = [...roles, ...nicks];
   const templates = listTemplates();
 
-  // 2) El turno escrito en el apodo o en un rol.
-  const named = templates.filter((t) => texts.some((n) => nameMatches(n, t.name)));
-  if (named.length) {
-    // Si un apodo nombrara dos turnos ("Shift 1 / Shift 2"), gana el más cercano a la llegada.
-    const options = named.map((t) => planFor(t, "apodo", startedAt));
-    options.sort((a, b) => Math.abs(startedAt - a.expectedAt) - Math.abs(startedAt - b.expectedAt));
-    return options[0];
+  // 2) El rol manda sobre el apodo. 3) Si no hay rol de turno, el apodo.
+  for (const [source, pool] of [["rol", roles], ["apodo", nicks]]) {
+    const named = templates.filter((t) => pool.some((n) => nameMatches(n, t.name)));
+    if (named.length) {
+      // Si tuviera dos ("Shift 1 / Shift 2"), gana el más cercano a la llegada.
+      return nearest(named.map((t) => planFor(t, source, startedAt)), startedAt);
+    }
   }
 
-  // 3) Cargos que no siguen turno.
+  // 4) Cargos que no siguen turno.
   if (isExempt(texts)) {
     return { source: "exento", templateName: null, startTime: null, graceMin: null, durationMin: exemptMinutes(), expectedAt: null };
   }
 
-  // 4) Por la hora de Start. Con un solo turno no hay forma de distinguir, así que no se mide.
+  // 5) Por la hora de Start. Con un solo turno no hay forma de distinguir, así que no se mide.
   if (templates.length < 2) return null;
-  const options = templates.map((t) => planFor(t, "hora", startedAt));
-  options.sort((a, b) => Math.abs(startedAt - a.expectedAt) - Math.abs(startedAt - b.expectedAt));
-  return options[0];
+  return nearest(templates.map((t) => planFor(t, "hora", startedAt)), startedAt);
 }
 
 module.exports = { listTemplates, resolveForStart, nameMatches, normalize, isExempt, exemptMinutes, tzLabel, DEFAULT_GRACE };
