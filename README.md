@@ -89,17 +89,19 @@ de 8 horas:
 | Shift 2 | 13:00 | 21:00 |
 | Shift 3 | 21:00 | 05:00 |
 
-Nadie se configura uno por uno. Al pulsar **Start**, el bot mira los roles de Discord
-de la persona: si alguno **contiene** el nombre de un turno (por ejemplo `Shift 2 (Chatter)`
-contiene `Shift 2`), se le aplica la hora de entrada de ese turno y el bot le dice
-si llegó a tiempo o tarde. Para cambiar a alguien de turno basta con cambiarle el rol.
+Nadie se configura uno por uno. Al pulsar **Start**, el bot lee el **apodo** de la
+persona en el servidor de Discord: si **contiene** el nombre de un turno (por ejemplo
+`Alejandro - Shift 2 (Chatter)` contiene `Shift 2`), se le aplica la hora de entrada de
+ese turno y el bot le dice si llegó a tiempo o tarde. Valen variantes como `shift2` o
+`SHIFT-2`. Si el apodo no lo trae, se prueba con el nombre global y con los roles.
+Para cambiar a alguien de turno basta con cambiarle el apodo.
 
-- La hora esperada se guarda en el propio fichaje: cambiar un turno o el rol de alguien
+- La hora esperada se guarda en el propio fichaje: cambiar un turno o el apodo de alguien
   no reescribe el historial.
 - Los **minutos de gracia** (10 por defecto) se ajustan por turno.
-- Quien no tenga un rol de turno no se mide en puntualidad, pero su turno, su break y sus
+- Quien no tenga un turno en su apodo no se mide en puntualidad, pero su turno, su break y sus
   horas se registran igual. El panel avisa de cuántas personas están en ese caso.
-- Un **horario personal** (Horarios, Excepciones) tiene prioridad sobre el turno del rol.
+- Un **horario personal** (Horarios, Excepciones) tiene prioridad sobre el turno del apodo.
   Sirve para quien no sigue su turno.
 - El turno nocturno cruza la medianoche: quien ficha a las 00:30 en Shift 3 llegó
   3 h 30 min tarde.

@@ -449,7 +449,7 @@ views.fichajes = {
   render(d) {
     const k = d.kpis;
     const noSched = k.unscheduled
-      ? `<div class="note section">${ic("info")}<span>${k.unscheduled} persona(s) sin turno detectado: no tienen un rol Shift ni un horario personal, así que no se mide su puntualidad.</span>${state.user?.role === "admin" ? '<a href="#horarios">Ver turnos</a>' : ""}</div>`
+      ? `<div class="note section">${ic("info")}<span>${k.unscheduled} persona(s) sin turno detectado: su apodo no incluye Shift 1, 2 o 3 y no tienen horario personal, así que no se mide su puntualidad.</span>${state.user?.role === "admin" ? '<a href="#horarios">Ver turnos</a>' : ""}</div>`
       : "";
 
     const lateTbl = d.late.length
@@ -828,7 +828,7 @@ views.horarios = {
     const html = `
       ${head("Horarios", `Hora de entrada esperada · ${esc(d.tzLabel)} (<b class="mono">${esc(d.tz)}</b>)`)}
 
-      <div class="note section">${ic("info")}<span>Cada persona se asigna sola al pulsar <b>Start</b>, según su rol de Discord: el rol debe <b>contener el nombre del turno</b>. Por ejemplo, el rol <b>Shift 2 (Chatter)</b> pertenece al turno <b>Shift 2</b>. No hay que configurar a nadie uno por uno.</span></div>
+      <div class="note section">${ic("info")}<span>Cada persona se asigna sola al pulsar <b>Start</b>, según su <b>apodo en el servidor de Discord</b>: debe contener el nombre del turno. Por ejemplo, <b>Alejandro - Shift 2 (Chatter)</b> pertenece al turno <b>Shift 2</b>. Valen variantes como shift2 o SHIFT-2. No hay que configurar a nadie uno por uno.</span></div>
 
       <section class="panel section" aria-labelledby="h-tpl"><div class="head"><h2 id="h-tpl">Turnos</h2></div>
         <p class="sub">Hora de entrada de cada turno. Se mide la puntualidad frente a esta hora, más los minutos de gracia. Cambiar un turno no modifica los fichajes ya hechos.</p>
@@ -843,7 +843,7 @@ views.horarios = {
         </form></section>
 
       <section class="panel section" aria-labelledby="h-sch"><div class="head"><h2 id="h-sch">Excepciones por persona</h2></div>
-        <p class="sub">Solo para quien no sigue su turno. Un horario personal tiene prioridad sobre el turno del rol. Aparecen quienes ya han usado Start.</p>
+        <p class="sub">Solo para quien no sigue su turno. Un horario personal tiene prioridad sobre el turno del apodo. Aparecen quienes ya han usado Start.</p>
         ${tbl}</section>
 
       <section class="panel" aria-labelledby="h-add"><div class="head"><h2 id="h-add">Agregar excepción</h2></div>
@@ -1142,7 +1142,7 @@ $("#view").addEventListener("click", async (e) => {
         toast(`Turno ${nameIn.value.trim()} guardado`);
         load({ silent: true });
       } else if (e.target.closest(".act-tdel")) {
-        if (!window.confirm(`¿Borrar el turno ${tname}? Quien tenga ese rol dejará de medirse en puntualidad. Los fichajes ya hechos no cambian.`)) return;
+        if (!window.confirm(`¿Borrar el turno ${tname}? Quien lo tenga en su apodo dejará de medirse en puntualidad. Los fichajes ya hechos no cambian.`)) return;
         await api(`/api/admin/templates/${tid}`, { method: "DELETE" });
         toast(`Turno ${tname} borrado`);
         load({ silent: true });

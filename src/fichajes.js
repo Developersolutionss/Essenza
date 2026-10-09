@@ -86,11 +86,12 @@ function statusText(st) {
   );
 }
 
-function runAction(action, discordId, name, roleNames = []) {
+// `names`: textos de la persona donde buscar su turno (apodo del servidor, nombre, roles).
+function runAction(action, discordId, name, names = []) {
   switch (action) {
     case "start": {
       const now = Date.now();
-      const plan = plans.resolveForStart({ discordId, roleNames, startedAt: now });
+      const plan = plans.resolveForStart({ discordId, names, startedAt: now });
       const r = shifts.startShift(discordId, name, now, plan);
       if (!r.ok) return `❌ Ya tienes un turno abierto desde ${ts(r.shift?.started_at ?? Date.now())}.`;
 
@@ -107,7 +108,7 @@ function runAction(action, discordId, name, roleNames = []) {
           ? `⚠️ Llegaste **${fmt(lateMs)}** tarde.`
           : "Llegaste a tiempo.";
       } else {
-        msg += "\nℹ️ No detecté tu turno: necesitas un rol de Discord que contenga Shift 1, Shift 2 o Shift 3. Hoy no se mide tu puntualidad.";
+        msg += "\nℹ️ No detecté tu turno. Pon **Shift 1**, **Shift 2** o **Shift 3** en tu apodo del servidor (por ejemplo \"Ana - Shift 2\"). Hoy no se mide tu puntualidad.";
       }
       return msg;
     }
@@ -159,11 +160,13 @@ function runAction(action, discordId, name, roleNames = []) {
 async function handleShiftButton(interaction) {
   const action = interaction.customId.split(":")[1];
   const name = interaction.member?.displayName || interaction.user.globalName || interaction.user.username;
-  // Nombres de los roles de Discord de la persona: de ahí sale su turno.
+  // El turno sale del apodo del servidor ("Ana - Shift 2 (Chatter)"); si no está
+  // ahí, se prueba con el nombre global y con los roles.
   const roleNames = interaction.member?.roles?.cache
     ? [...interaction.member.roles.cache.values()].map((r) => r.name)
     : [];
-  const text = runAction(action, interaction.user.id, name, roleNames);
+  const names = [name, interaction.user.globalName, ...roleNames];
+  const text = runAction(action, interaction.user.id, name, names);
 
   // La acción ya quedó guardada en la base: pase lo que pase con el panel del
   // canal, la persona tiene que recibir su confirmación.
@@ -180,4 +183,4 @@ async function handleShiftButton(interaction) {
   }
 }
 
-module.exports = { panelPayload, handleShiftButton };
+module.exports = { panelPayload, handleShiftButton, runAction };
