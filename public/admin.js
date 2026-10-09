@@ -9,8 +9,8 @@ const nf = new Intl.NumberFormat("es");
 const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /* Colores de gráficas (RGB para poder derivar tramas y transparencias). */
-const RGB = { cost: "245,158,11", saved: "34,197,94", danger: "239,68,68", info: "96,165,250" };
-const COL = { cost: "#f59e0b", saved: "#22c55e", danger: "#ef4444", info: "#60a5fa", fg: "#f8fafc", muted: "#94a3b8", grid: "rgba(148,163,184,.16)", surface: "#1b2336" };
+const RGB = { cost: "184,134,11", saved: "21,128,61", danger: "220,38,38", info: "87,83,78" };
+const COL = { cost: "#b8860b", saved: "#15803d", danger: "#dc2626", info: "#57534e", fg: "#1c1917", muted: "#6b5f2a", grid: "rgba(138,122,58,.22)", surface: "#ffffff", track: "#f3ebc8" };
 
 const TITLES = { resumen: "Resumen", fichajes: "Fichajes", elevenlabs: "ElevenLabs", cuentas: "Cuentas", horarios: "Horarios" };
 const RANGES = [["today", "Hoy"], ["7", "7 días"], ["30", "30 días"], ["90", "90 días"]];
@@ -121,12 +121,12 @@ if (window.Chart) {
   Chart.defaults.font.size = 12;
   Chart.defaults.borderColor = COL.grid;
   const tt = Chart.defaults.plugins.tooltip;
-  tt.backgroundColor = "#0f172a";
-  tt.borderColor = "#64748b";
+  tt.backgroundColor = "#1c1917";
+  tt.borderColor = "#1c1917";
   tt.borderWidth = 1;
   tt.padding = 10;
-  tt.titleColor = COL.fg;
-  tt.bodyColor = "#cbd5e1";
+  tt.titleColor = "#ffffff";
+  tt.bodyColor = "#fef3c7";
 }
 
 /* Trama rayada: distingue una serie sin depender solo del color. */
@@ -648,7 +648,7 @@ views.elevenlabs = {
       html,
       after() {
         dailyChart("c-daily", d.daily);
-        if (!plan.error) doughnut("c-plan", "Créditos del plan: usados frente a disponibles", ["Usado", "Disponible"], [plan.used, Math.max(0, plan.limit - plan.used)], [COL.cost, "#272f42"]);
+        if (!plan.error) doughnut("c-plan", "Créditos del plan: usados frente a disponibles", ["Usado", "Disponible"], [plan.used, Math.max(0, plan.limit - plan.used)], [COL.cost, COL.track]);
         doughnut("c-cache", "Audios generados frente a reutilizados desde caché", ["Generados", "De caché"], [t.generations, t.cacheHits], [COL.cost, hatch(RGB.saved)]);
 
         // Acumulado + proyección punteada hasta fin de mes.

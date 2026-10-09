@@ -19,7 +19,7 @@
 }
 #nav a:hover { background: var(--surface-2); color: var(--fg); }
 #nav a[aria-current="page"] { background: var(--accent-soft); color: var(--fg); box-shadow: inset 3px 0 0 var(--accent); }
-#nav a[aria-current="page"] .ic { color: var(--accent); }
+#nav a[aria-current="page"] .ic { color: var(--accent-ink); }
 .side-foot { margin-top: auto; display: grid; gap: var(--sp-1); padding: 0 var(--sp-2); }
 .clock { font: 500 1.625rem var(--font-data); letter-spacing: -0.04em; }
 .tz { color: var(--fg-muted); font: 400 var(--fs-xs) var(--font-data); margin-bottom: var(--sp-2); }
@@ -30,10 +30,10 @@
 /* ---------- Barra de estado en vivo ---------- */
 .statusbar { display: flex; justify-content: flex-end; align-items: center; gap: var(--sp-2); flex-wrap: wrap; margin-bottom: var(--sp-3); min-height: 32px; }
 .live { display: inline-flex; align-items: center; gap: var(--sp-2); font: 500 var(--fs-xs) var(--font-data); color: var(--fg-2); padding: 4px 12px; border-radius: 99px; border: 1px solid var(--border-control); }
-.live .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; }
+.live .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); flex: none; }
 .live.on .dot { animation: pulse 2s var(--ease) infinite; }
 .live.paused .dot { background: var(--fg-muted); }
-.live.stale { color: var(--warn-text); border-color: rgba(251, 191, 36, 0.55); }
+.live.stale { color: var(--warn-text); border-color: rgba(146, 64, 14, 0.5); }
 .live.stale .dot { background: var(--warn-text); }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
@@ -63,7 +63,7 @@
 /* ---------- Indicadores ---------- */
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: var(--sp-3); margin-bottom: var(--sp-3); }
 .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--sp-3) var(--sp-4); }
-.kpi.attn { border-color: rgba(248, 113, 113, 0.55); background: linear-gradient(180deg, var(--danger-soft), var(--surface)); }
+.kpi.attn { border-color: rgba(185, 28, 28, 0.5); background: linear-gradient(180deg, var(--danger-soft), var(--surface)); }
 .kpi .k { display: flex; align-items: center; gap: 6px; color: var(--fg-muted); font-size: var(--fs-xs); font-weight: 500; }
 .kpi.attn .k { color: var(--danger-text); }
 .kpi .v { font: 500 var(--fs-xl) var(--font-data); letter-spacing: -0.04em; line-height: 1.15; margin: 6px 0 2px; }
@@ -83,14 +83,14 @@
 .donut .center span { color: var(--fg-muted); font-size: var(--fs-xs); }
 .legend { display: flex; gap: var(--sp-4); justify-content: center; flex-wrap: wrap; font-size: var(--fs-xs); color: var(--fg-2); margin-top: var(--sp-2); }
 .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -2px; }
-.legend i.hatch { background: repeating-linear-gradient(45deg, var(--accent) 0 2px, rgba(34, 197, 94, 0.3) 2px 5px); }
+.legend i.hatch { background: repeating-linear-gradient(45deg, var(--good) 0 2px, rgba(22, 163, 74, 0.25) 2px 5px); }
 .bar-cell { width: 110px; min-width: 110px; }
 .bar-cell i { display: block; height: 6px; border-radius: 99px; background: var(--cost); }
 
 /* ---------- Alertas ---------- */
 .alerts { display: grid; gap: var(--sp-2); }
 .alert { display: flex; gap: var(--sp-3); align-items: center; padding: var(--sp-3); border-radius: var(--radius-sm); background: var(--surface-2); border: 1px solid var(--border); }
-.alert.bad { border-color: rgba(248, 113, 113, 0.55); }
+.alert.bad { border-color: rgba(185, 28, 28, 0.5); }
 .alert.bad .ic { color: var(--danger-text); }
 .alert.warn .ic { color: var(--warn-text); }
 .alert .t { flex: 1; min-width: 0; }
@@ -127,7 +127,7 @@ input.narrow { width: 96px; }
   }
   #nav a { flex: 1 1 0; min-width: 0; flex-direction: column; justify-content: center; gap: 2px; min-height: 56px; text-align: center; border-radius: 0; font-size: var(--fs-xs); box-shadow: none !important; }
   #nav a span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
-  #nav a[aria-current="page"] { background: transparent; color: var(--accent); }
+  #nav a[aria-current="page"] { background: transparent; color: var(--accent-ink); }
   .main { padding: var(--sp-4) var(--sp-4) 96px; }
   .statusbar { justify-content: flex-start; }
 }
