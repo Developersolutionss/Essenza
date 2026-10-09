@@ -53,8 +53,9 @@ function panelPayload() {
     .setColor(0x3e6259)
     .setDescription(
       `Pulsa **Start** para iniciar tu turno.\n` +
-        `Debes completar **${fmt(shifts.SHIFT_MS)}** de trabajo efectivo para poder pulsar **End**. ` +
-        `Tienes **un solo break** por turno, de **${fmt(shifts.BREAK_MS)}**, y no cuenta como trabajo.`
+        `Debes completar **${fmt(shifts.SHIFT_MS)}** de turno para poder pulsar **End**. ` +
+        `Tienes **un solo break** por turno, de **${fmt(shifts.BREAK_MS)}**: cuenta como trabajado, ` +
+        `pero si te pasas, el exceso se descuenta y tienes que recuperarlo.`
     )
     .addFields(
       { name: `En turno (${working.length})`, value: fieldValue(working) },
@@ -82,7 +83,7 @@ function statusText(st) {
       ? "\n✅ Ya puedes pulsar **End**."
       : st.onBreak
       ? ""
-      : `\nPodrás terminar a partir de ${ts(Date.now() + st.remainingMs)} si no haces más breaks.`)
+      : `\nPodrás terminar a partir de ${ts(Date.now() + st.remainingMs)}.`)
   );
 }
 
@@ -97,8 +98,8 @@ function runAction(action, discordId, name, names = []) {
 
       let msg =
         `✅ Turno iniciado a las ${ts(r.shift.started_at)}.\n` +
-        `Podrás pulsar **End** cuando acumules ${fmt(shifts.SHIFT_MS)} de trabajo (sin contar breaks), ` +
-        `aprox. ${ts(r.shift.started_at + shifts.SHIFT_MS)}.`;
+        `Podrás pulsar **End** a las ${ts(r.shift.started_at + shifts.SHIFT_MS)}, al cumplir ${fmt(shifts.SHIFT_MS)} ` +
+        `(el break de ${fmt(shifts.BREAK_MS)} cuenta; solo se suma lo que te pases).`;
 
       if (plan?.source === "exento") {
         msg += "\nℹ️ Tu cargo no sigue un turno fijo, así que no se mide tu puntualidad.";
@@ -149,7 +150,7 @@ function runAction(action, discordId, name, names = []) {
         if (r.reason === "on_break") return "❌ Estás en break. Pulsa **Resume** y luego **End**.";
         return (
           `⛔ Aún no puedes terminar. Llevas **${fmt(r.st.workedMs)}** de ${fmt(shifts.SHIFT_MS)}; ` +
-          `te faltan **${fmt(r.st.remainingMs)}** (a partir de ${ts(Date.now() + r.st.remainingMs)} si no haces más breaks).`
+          `te faltan **${fmt(r.st.remainingMs)}** (a partir de ${ts(Date.now() + r.st.remainingMs)}).`
         );
       }
       return `🏁 Turno terminado. Trabajado: **${fmt(r.workedMs)}**. Break: **${fmt(r.breakMs)}**` +

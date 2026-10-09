@@ -12,7 +12,8 @@ function breaksOf(shiftId) {
   return db.prepare("SELECT * FROM shift_breaks WHERE shift_id = ? ORDER BY started_at").all(shiftId);
 }
 
-// Resume un turno: el tiempo trabajado NO incluye los breaks.
+// Resume un turno. El break permitido (BREAK_MINUTES) es tiempo pagado y cuenta
+// como trabajado; solo el exceso se descuenta y hay que recuperarlo.
 function summarize(shift, breaks, now = Date.now()) {
   const end = shift.ended_at || now;
   let breakMs = 0;
@@ -21,11 +22,12 @@ function summarize(shift, breaks, now = Date.now()) {
     breakMs += (b.ended_at || now) - b.started_at;
     if (!b.ended_at) openBreak = b;
   }
-  const workedMs = Math.max(0, end - shift.started_at - breakMs);
+  const breakOverMs = Math.max(0, breakMs - BREAK_MS);
+  const workedMs = Math.max(0, end - shift.started_at - breakOverMs);
   return {
     workedMs,
     breakMs,
-    breakOverMs: Math.max(0, breakMs - BREAK_MS),
+    breakOverMs,
     onBreak: Boolean(openBreak),
     openBreakStartedAt: openBreak ? openBreak.started_at : null,
     canEnd: !openBreak && workedMs >= SHIFT_MS,

@@ -477,7 +477,8 @@ function openTable(id, open, rules, compact = false) {
     const r = [{ h: `<span class="who">${esc(s.name)}</span>`, v: s.name }];
     if (!compact) r.push({ h: `<span class="mono">${fmtTime(s.startedAt)}</span>`, v: s.startedAt });
     r.push(statusPills(s));
-    r.push({ h: tick(s.workedMs, !s.onBreak) + (compact ? "" : ` <span class="dim">/ ${fmtDur(rules.shiftMs)}</span>`), v: s.workedMs });
+    // El break permitido cuenta como trabajado: el contador solo se detiene al pasarse.
+    r.push({ h: tick(s.workedMs, !s.onBreak || s.breakMs < rules.breakMs) + (compact ? "" : ` <span class="dim">/ ${fmtDur(rules.shiftMs)}</span>`), v: s.workedMs });
     r.push({ h: tick(s.breakMs, s.onBreak, rules.breakMs) + (compact ? "" : ` <span class="dim">/ ${fmtDur(rules.breakMs)}</span>`), v: s.breakMs });
     if (!compact) {
       r.push(

@@ -44,7 +44,9 @@ las pidió) y el mp3 va adjunto.
 **Break**, **Resume**, **End** y **Mi estado**, más la lista de quién está en
 turno o en break, y lo fija en el canal.
 
-- Para pulsar **End** hay que acumular 8 h de trabajo efectivo. El break no cuenta.
+- Para pulsar **End** hay que cumplir 8 h de turno. El break de 30 min es tiempo pagado y
+  cuenta como trabajado: no hay que recuperarlo. Solo el exceso de break se descuenta, y
+  ese sí hay que recuperarlo antes de poder pulsar End.
 - Hay **un solo break por turno**, de 30 min. El exceso queda marcado en el panel web.
 - Reglas ajustables en `.env`: `SHIFT_HOURS` y `BREAK_MINUTES`.
 - Un turno que quedó abierto se cierra desde el panel web, en Fichajes → En vivo.
