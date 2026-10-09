@@ -39,18 +39,31 @@ function startOfLocalDay(ms, tz = getTz()) {
   return zonedToUtc(p.y, p.m, p.d, 0, 0, tz);
 }
 
+function startOfLocalMonth(ms, tz = getTz()) {
+  const p = parts(ms, tz);
+  return zonedToUtc(p.y, p.m, 1, 0, 0, tz);
+}
+
 // "YYYY-MM-DD" en la zona local.
 function localDate(ms, tz = getTz()) {
   const p = parts(ms, tz);
   return `${p.y}-${String(p.m).padStart(2, "0")}-${String(p.d).padStart(2, "0")}`;
 }
 
-// Hora esperada de inicio más cercana al inicio real (cubre turnos que cruzan medianoche).
+// Hora de entrada esperada para un fichaje concreto.
+// Se elige la última hora prevista que no esté más de EARLY_MAX_HOURS en el
+// futuro: así "llegó 13 h tarde" no se confunde con "llegó 11 h antes de mañana",
+// y los turnos que cruzan medianoche siguen saliendo bien.
+const EARLY_MAX_MS = Number(process.env.EARLY_MAX_HOURS || 4) * 3600 * 1000;
+
 function expectedStart(startedAt, hhmm, tz = getTz()) {
   const p = parts(startedAt, tz);
   const [h, mi] = hhmm.split(":").map(Number);
-  const candidates = [-1, 0, 1].map((dd) => zonedToUtc(p.y, p.m, p.d + dd, h, mi, tz));
-  return candidates.reduce((best, c) => (Math.abs(c - startedAt) < Math.abs(best - startedAt) ? c : best));
+  const candidates = [-1, 0, 1].map((dd) => zonedToUtc(p.y, p.m, p.d + dd, h, mi, tz)).sort((x, y) => x - y);
+  const usable = candidates.filter((c) => c - startedAt <= EARLY_MAX_MS);
+  // La más tardía que ya empezó o está por empezar dentro del margen.
+  if (usable.length) return usable[usable.length - 1];
+  return candidates[0];
 }
 
 // Modificador de SQLite para agrupar por día local, p. ej. "-300 minutes".
@@ -64,4 +77,4 @@ function sqlTime(ms) {
   return new Date(ms).toISOString().slice(0, 19).replace("T", " ");
 }
 
-module.exports = { getTz, parts, startOfLocalDay, localDate, expectedStart, zonedToUtc, sqlDayModifier, sqlTime };
+module.exports = { getTz, parts, startOfLocalDay, startOfLocalMonth, localDate, expectedStart, zonedToUtc, sqlDayModifier, sqlTime };

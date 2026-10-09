@@ -1,70 +1,105 @@
 # Essensa — Generador de audios con voz clonada
 
-MVP para que los chatters generen audios personalizados con la voz clonada
-de cada modelo, a partir de texto. Node/Express + SQLite, con caché de
-frases repetidas y límites de uso por chatter.
+Herramienta interna para que los chatters generen audios con la voz clonada de
+cada modelo, a partir de texto. Node/Express + SQLite, con caché de frases
+repetidas, límites de uso por chatter, fichajes por Discord y panel de
+administración. Todo corre en un único proceso.
 
 ## Setup
 
 ```
 npm install
-cp .env.example .env   # completar ELEVENLABS_API_KEY
-node src/seed.js       # carga chatter/modelo/frases de prueba
+cp .env.example .env    # completar las claves y contraseñas
+node src/seed.js        # datos de prueba (opcional)
 npm run dev
 ```
 
-Abrir `http://localhost:3000`.
+Panel de administración en `http://localhost:3000/admin`.
+La web de chatters (`/`) solo se activa si pones `CHATTER_PASSWORD`.
 
 ## Bot de Discord
 
-Los chatters generan los audios desde Discord; la web queda como apoyo.
-El bot corre dentro del mismo proceso que el servidor y se activa si hay
-`DISCORD_TOKEN` y `DISCORD_CLIENT_ID` en `.env` (opcional `DISCORD_GUILD_ID`).
+Los chatters generan los audios desde Discord. El bot corre dentro del mismo
+proceso que el servidor y se activa si hay `DISCORD_TOKEN` y `DISCORD_CLIENT_ID`
+en `.env` (opcional `DISCORD_GUILD_ID`, que hace que los comandos aparezcan al
+instante en ese servidor).
 
 1. Crear la aplicación en discord.com/developers/applications, agregar un Bot y copiar el token.
-2. Invitar el bot al servidor con los scopes `bot` y `applications.commands`.
+2. Invitar el bot con los scopes `bot` y `applications.commands`.
 3. Un manager (permiso Gestionar servidor) vincula cada usuario con su chatter: `/vincular`.
 
-Comandos: `/voz modelo texto`, `/frase modelo frase`, `/uso`, `/vincular`.
-Las respuestas son efímeras (solo las ve quien las pidió) y el mp3 va adjunto.
+Comandos: `/voz modelo texto`, `/frase modelo frase`, `/uso`, `/vincular`,
+`/panel-fichajes`. Los dos últimos exigen el permiso Gestionar servidor, que se
+comprueba también al ejecutarlos. Las respuestas son efímeras (solo las ve quien
+las pidió) y el mp3 va adjunto.
 
 ## Fichajes
 
-`/panel-fichajes` (permiso Gestionar servidor) publica en el canal un panel con los
-botones **Start**, **Break**, **Resume**, **End** y **Mi estado**, y la lista de quién
-está en turno o en break.
+`/panel-fichajes` publica en el canal un panel con los botones **Start**,
+**Break**, **Resume**, **End** y **Mi estado**, más la lista de quién está en
+turno o en break, y lo fija en el canal.
 
-- Para pulsar **End** hay que acumular 8 h de trabajo efectivo. El tiempo de break no cuenta.
-- El break es de 30 min por turno (se puede dividir). El exceso queda marcado en el panel web.
+- Para pulsar **End** hay que acumular 8 h de trabajo efectivo. El break no cuenta.
+- Hay **un solo break por turno**, de 30 min. El exceso queda marcado en el panel web.
 - Reglas ajustables en `.env`: `SHIFT_HOURS` y `BREAK_MINUTES`.
+- Un turno que quedó abierto se cierra desde el panel web, en Fichajes → En vivo.
 
-## Panel de administrador
+## Panel de administración
 
-`http://localhost:3000/admin`, protegido por `ADMIN_PASSWORD` en `.env` (sin esa variable el panel queda desactivado).
-Muestra créditos de ElevenLabs (saldo real del plan y consumo propio), voces más usadas,
-consumo por chatter, ahorro por caché, fichajes en vivo e historial de turnos con excesos de break.
+`/admin`, protegido por `ADMIN_PASSWORD` (sin esa variable el panel queda
+desactivado). Secciones:
+
+- **Resumen**: quién está en turno, alertas y consumo del día.
+- **Fichajes**: llegadas tarde, excesos de break, historial y cierre de turnos abiertos.
+- **ElevenLabs**: créditos del plan, consumo diario, proyección del mes, voces más usadas y ahorro por caché.
+- **Horarios**: hora de entrada esperada y minutos de gracia por persona. Sin horario, nadie se marca como tarde.
+
+## Costos y límites
+
+- Cada generación nueva se cobra por carácter; lo que ya está en caché es gratis.
+- Límite diario por chatter (`chatters.daily_char_limit`, 20 000 por defecto).
+  La cuota se reserva antes de llamar al proveedor, así que dos pedidos
+  simultáneos no pueden pasarse del límite.
+- Dos pedidos simultáneos de la misma frase nueva comparten una sola llamada al proveedor.
+- `MAX_TEXT_CHARS` (1000 por defecto) limita el tamaño de cada audio.
+- El "día" de los límites, de `/uso` y del panel es el de `TIMEZONE`.
+
+## Despliegue en un VPS
+
+El proceso escucha en `127.0.0.1` por defecto. Publícalo con un proxy inverso
+(nginx o Caddy) que ponga HTTPS; las cookies de sesión llevan `Secure`.
+
+1. `TRUST_PROXY=1` para que el bloqueo por intentos fallidos vea la IP real.
+2. Contraseñas largas en `ADMIN_PASSWORD` y, si usas la web, `CHATTER_PASSWORD`.
+3. Arrancar con `npm start` desde un servicio de systemd, **un solo proceso**
+   (dos instancias harían que el bot responda dos veces).
+4. Copia de seguridad diaria de `data/` (base de datos y audios): es lo único que no se puede recrear.
+5. `HOST=0.0.0.0` solo si sabes lo que haces: expone la aplicación sin HTTPS.
 
 ## Antes de usar con una modelo real
 
 1. Clonar su voz en ElevenLabs (Instant Voice Clone) y copiar el `voice_id`.
-2. Cargar el modelo en la tabla `models` con ese `voice_id`.
-3. Poner el `voice_id` en `models.json` y ejecutar `node src/loadModels.js`.
+2. Poner el `voice_id` en `models.json` y ejecutar `node src/loadModels.js`.
+   Sin `voice_id` la modelo queda inactiva y no se puede elegir.
 
 ## Estructura
 
-- `src/db.js` — schema SQLite (modelos, chatters, caché, uso).
-- `src/providers/` — capa de proveedor de voz, desacoplada para poder
-  swapear ElevenLabs por otro proveedor sin tocar el resto del sistema.
-- `src/generator.js` — lógica única de generación (límite, caché), usada por web y bot.
-- `src/discord.js` — bot de Discord (comandos slash).
-- `src/shifts.js` / `src/fichajes.js` — lógica y botones de fichajes.
-- `src/admin.js` + `public/admin.*` — panel de administrador.
-- `src/routes.js` — API: modelos, frases, generación, resumen de uso.
-- `public/` — frontend simple para chatters.
+- `src/db.js` — schema SQLite y migraciones (modelos, chatters, caché, uso, turnos, horarios).
+- `src/providers/` — capa de proveedor de voz, desacoplada para poder cambiar
+  ElevenLabs por otro proveedor sin tocar el resto del sistema.
+- `src/generator.js` — lógica única de generación (cuota, caché, reintentos), usada por web y bot.
+- `src/auth.js` — sesiones por cookie firmada para el panel y para la web de chatters.
+- `src/timezone.js` — días locales, horarios de entrada y zona horaria.
+- `src/discord.js` — comandos del bot. `src/shifts.js` + `src/fichajes.js` — reglas y botones de fichajes.
+- `src/admin.js` + `public/admin.*` — panel de administración.
+- `src/routes.js` + `public/index.html` — API y web de chatters.
+- `public/ds.css` — sistema de diseño compartido por las dos interfaces.
 
-## Pendiente para producción
+## Pendiente
 
-- Autenticación real de chatters/managers (hoy `chatter_id` se ingresa a mano).
-- Panel de manager con el resumen de `/api/usage/summary`.
-- Subir `data/audio` a almacenamiento persistente si se despliega en un
-  entorno sin disco persistente.
+- Identidad real por chatter en la web (hoy el `chatter_id` se escribe a mano
+  tras entrar con la contraseña compartida). En Discord sí es el usuario real.
+- Días libres por persona en los horarios: hoy un día sin turno no se distingue
+  de una falta.
+- Si algún día corren varias instancias del proceso, las protecciones contra
+  pedidos simultáneos tendrían que pasar a la base de datos.

@@ -27,6 +27,26 @@ function panelPayload() {
     `• <@${o.shift.discord_id}> — desde ${ts(o.shift.started_at)}` +
     (o.onBreak ? ` (break desde ${ts(o.openBreakStartedAt, "R")})` : "");
 
+  // Un campo de embed admite 1024 caracteres: con mucha gente en turno hay que
+  // recortar la lista, o Discord rechaza la actualización y nadie ve respuesta.
+  const fieldValue = (list) => {
+    if (!list.length) return "Nadie por ahora.";
+    const lines = [];
+    let used = 0;
+    for (let i = 0; i < list.length; i++) {
+      const l = line(list[i]);
+      const rest = list.length - i;
+      const tail = "…y " + rest + " más";
+      if (used + l.length + 1 + tail.length > 1024) {
+        lines.push(tail);
+        break;
+      }
+      lines.push(l);
+      used += l.length + 1;
+    }
+    return lines.join("\n").slice(0, 1024);
+  };
+
   const embed = new EmbedBuilder()
     .setTitle("🕐 Fichajes")
     .setColor(0x3e6259)
@@ -36,8 +56,8 @@ function panelPayload() {
         `Tienes **un solo break** por turno, de **${fmt(shifts.BREAK_MS)}**, y no cuenta como trabajo.`
     )
     .addFields(
-      { name: `En turno (${working.length})`, value: working.map(line).join("\n") || "Nadie por ahora." },
-      { name: `En break (${onBreak.length})`, value: onBreak.map(line).join("\n") || "Nadie." }
+      { name: `En turno (${working.length})`, value: fieldValue(working) },
+      { name: `En break (${onBreak.length})`, value: onBreak.length ? fieldValue(onBreak) : "Nadie." }
     );
 
   const row = new ActionRowBuilder().addComponents(
@@ -125,9 +145,20 @@ async function handleShiftButton(interaction) {
   const action = interaction.customId.split(":")[1];
   const name = interaction.member?.displayName || interaction.user.globalName || interaction.user.username;
   const text = runAction(action, interaction.user.id, name);
-  // Primero se refresca el panel del canal y luego se responde en privado.
-  await interaction.update(panelPayload());
-  await interaction.followUp({ content: text, flags: MessageFlags.Ephemeral });
+
+  // La acción ya quedó guardada en la base: pase lo que pase con el panel del
+  // canal, la persona tiene que recibir su confirmación.
+  try {
+    await interaction.update(panelPayload());
+    await interaction.followUp({ content: text, flags: MessageFlags.Ephemeral });
+  } catch (err) {
+    console.error("No se pudo refrescar el panel de fichajes:", err.message);
+    const reply = { content: text, flags: MessageFlags.Ephemeral };
+    const send = interaction.replied || interaction.deferred
+      ? interaction.followUp(reply)
+      : interaction.reply(reply);
+    await send.catch(() => {});
+  }
 }
 
 module.exports = { panelPayload, handleShiftButton };

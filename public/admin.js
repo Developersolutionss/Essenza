@@ -52,6 +52,7 @@ const ICONS = {
   coins: '<circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/>',
   info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
   plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  stop: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 9h6v6H9z"/>',
 };
 const ic = (n) =>
   `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ICONS[n] || ""}</svg>`;
@@ -377,12 +378,20 @@ function openTable(id, open, rules, compact = false) {
   const cols = [{ h: "Persona", sort: "text" }];
   if (!compact) cols.push({ h: "Inicio", sort: "num" });
   cols.push({ h: "Estado" }, { h: "Trabajado", num: true, sort: "num" }, { h: "Break", num: true, sort: "num" });
+  if (!compact) cols.push({ h: "" });
   const rows = open.map((s) => {
     const r = [{ h: `<span class="who">${esc(s.name)}</span>`, v: s.name }];
     if (!compact) r.push({ h: `<span class="mono">${fmtTime(s.startedAt)}</span>`, v: s.startedAt });
     r.push(statusPills(s));
     r.push({ h: tick(s.workedMs, !s.onBreak) + (compact ? "" : ` <span class="dim">/ ${fmtDur(rules.shiftMs)}</span>`), v: s.workedMs });
     r.push({ h: tick(s.breakMs, s.onBreak, rules.breakMs) + (compact ? "" : ` <span class="dim">/ ${fmtDur(rules.breakMs)}</span>`), v: s.breakMs });
+    if (!compact) {
+      r.push(
+        `<div class="row-actions" data-shift="${s.id}" data-name="${esc(s.name)}">` +
+          `<button type="button" class="btn sm ghost act-close" data-key="close-${s.id}">${ic("stop")}Cerrar turno</button>` +
+          `</div><span class="row-msg" role="alert"></span>`
+      );
+    }
     return r;
   });
   return table(id, "Turnos abiertos ahora", cols, rows);
@@ -932,6 +941,26 @@ $("#view").addEventListener("click", async (e) => {
 
   const actions = e.target.closest(".row-actions");
   if (!actions) return;
+
+  // Cerrar un turno que quedó abierto (alguien se fue sin pulsar End).
+  if (actions.dataset.shift) {
+    const who = actions.dataset.name;
+    if (!e.target.closest(".act-close")) return;
+    if (!window.confirm(`¿Cerrar ahora el turno de ${who}? Se registrará como terminado en este momento.`)) return;
+    try {
+      const r = await api(`/api/admin/shifts/${actions.dataset.shift}/close`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!r.ok) return toast((await r.json().catch(() => ({}))).error || "No se pudo cerrar el turno.", true);
+      toast(`Turno de ${who} cerrado`);
+      load({ silent: true });
+    } catch (err) {
+      if (err.message !== "auth") toast(err.message, true);
+    }
+    return;
+  }
   const id = actions.dataset.id;
   const name = actions.dataset.name;
   const row = actions.closest("tr");

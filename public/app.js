@@ -70,7 +70,8 @@ function setBusy(busy) {
 
 async function loadModels() {
   try {
-    const res = await fetch("/api/models");
+    const res = await fetch("/api/models", { credentials: "same-origin" });
+    if (res.status === 401) return showLogin();
     if (!res.ok) throw new Error();
     const models = await res.json();
     modelSelect.replaceChildren();
@@ -89,7 +90,7 @@ async function loadModels() {
 
 async function loadPhrases() {
   try {
-    const res = await fetch("/api/phrases");
+    const res = await fetch("/api/phrases", { credentials: "same-origin" });
     if (!res.ok) throw new Error();
     const phrases = await res.json();
     phrases.forEach((p) => phraseSelect.appendChild(option(p.text, p.label)));
@@ -161,10 +162,15 @@ form.addEventListener("submit", async (e) => {
   try {
     const res = await fetch("/api/generate", {
       method: "POST",
+      credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ chatter_id: Number(chatterId), model_id: Number(modelId), text }),
     });
 
+    if (res.status === 401) {
+      setBusy(false);
+      return showLogin();
+    }
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       setStatus(data.error || "No se pudo generar el audio.", true);
@@ -195,6 +201,64 @@ form.addEventListener("submit", async (e) => {
   }
 });
 
-loadModels();
-loadPhrases();
-updateCount();
+/* ---------- Acceso ---------- */
+
+const loginSection = document.getElementById("login");
+const disabledSection = document.getElementById("disabled");
+const appSection = document.getElementById("app");
+
+function showLogin() {
+  loginSection.hidden = false;
+  appSection.hidden = true;
+  disabledSection.hidden = true;
+  setTimeout(() => document.getElementById("password").focus(), 0);
+}
+
+function showApp() {
+  loginSection.hidden = true;
+  disabledSection.hidden = true;
+  appSection.hidden = false;
+  loadModels();
+  loadPhrases();
+  updateCount();
+}
+
+document.getElementById("loginForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const pass = document.getElementById("password");
+  const out = document.getElementById("loginError");
+  out.replaceChildren();
+  pass.setAttribute("aria-invalid", "false");
+  const r = await fetch("/api/login", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password: pass.value }),
+  });
+  if (r.ok) {
+    pass.value = "";
+    showApp();
+    return;
+  }
+  const msg = (await r.json().catch(() => ({}))).error || "No se pudo entrar.";
+  pass.setAttribute("aria-invalid", "true");
+  out.insertAdjacentHTML("afterbegin", ICON_ALERT);
+  out.appendChild(Object.assign(document.createElement("span"), { textContent: msg }));
+  pass.focus();
+});
+
+document.getElementById("logout").addEventListener("click", async () => {
+  await fetch("/api/logout", { method: "POST", credentials: "same-origin" });
+  showLogin();
+});
+
+(async () => {
+  try {
+    const s = await (await fetch("/api/session", { credentials: "same-origin" })).json();
+    if (!s.enabled) return (disabledSection.hidden = false);
+    if (s.authenticated) showApp();
+    else showLogin();
+  } catch {
+    showLogin();
+  }
+})();

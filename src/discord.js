@@ -36,12 +36,14 @@ const commands = [
   new SlashCommandBuilder()
     .setName("panel-fichajes")
     .setDescription("(Manager) Publica el panel de fichajes en este canal")
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+    .setDMPermission(false),
   new SlashCommandBuilder().setName("uso").setDescription("Tu consumo de caracteres de hoy"),
   new SlashCommandBuilder()
     .setName("vincular")
     .setDescription("(Manager) Vincula un usuario de Discord con un chatter")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+    .setDMPermission(false)
     .addUserOption((o) => o.setName("usuario").setDescription("Usuario de Discord").setRequired(true))
     .addStringOption((o) =>
       o.setName("chatter").setDescription("Chatter").setRequired(true).setAutocomplete(true)
@@ -95,8 +97,26 @@ async function replyWithAudio(interaction, chatter, modelId, text) {
   }
 }
 
+// Cada servidor puede cambiar desde Ajustes los permisos por defecto de un
+// comando, así que los de manager se vuelven a comprobar al ejecutarlos.
+const MANAGER_COMMANDS = new Set(["vincular", "panel-fichajes"]);
+
+function isManager(interaction) {
+  return Boolean(interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild));
+}
+
 async function handleCommand(interaction) {
   const name = interaction.commandName;
+
+  if (!interaction.inGuild()) {
+    return interaction.reply({ content: "❌ Usa estos comandos dentro del servidor.", flags: MessageFlags.Ephemeral });
+  }
+  if (MANAGER_COMMANDS.has(name) && !isManager(interaction)) {
+    return interaction.reply({
+      content: "❌ Este comando es solo para managers (permiso Gestionar servidor).",
+      flags: MessageFlags.Ephemeral,
+    });
+  }
 
   if (name === "panel-fichajes") {
     await interaction.reply(panelPayload());

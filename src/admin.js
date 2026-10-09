@@ -1,76 +1,21 @@
-const crypto = require("crypto");
 const express = require("express");
 const db = require("./db");
 const shifts = require("./shifts");
+const { createAuth } = require("./auth");
 const tzu = require("./timezone");
 
 const router = express.Router();
-const SESSION_MS = 12 * 3600 * 1000;
-const COOKIE = "essensa_admin";
 const DAY = 86400000;
 
 // ---------------------------------------------------------------------------
-// Autenticación (contraseña única en ADMIN_PASSWORD)
+// Autenticación (contraseña única en ADMIN_PASSWORD, sesión en src/auth.js)
 // ---------------------------------------------------------------------------
 
-const secret = () => process.env.ADMIN_PASSWORD || "";
-const sign = (payload) => crypto.createHmac("sha256", secret()).update(payload).digest("hex");
+const auth = createAuth({ cookieName: "essensa_admin", secretEnv: "ADMIN_PASSWORD", label: "Panel" });
+const requireAdmin = auth.require;
 
-function makeToken() {
-  const exp = String(Date.now() + SESSION_MS);
-  return `${exp}.${sign(exp)}`;
-}
-
-function validToken(token) {
-  if (!secret() || !token) return false;
-  const [exp, sig] = token.split(".");
-  if (!exp || !sig || Number(exp) < Date.now()) return false;
-  const expected = Buffer.from(sign(exp));
-  const given = Buffer.from(sig);
-  return expected.length === given.length && crypto.timingSafeEqual(expected, given);
-}
-
-function readCookie(req, name) {
-  for (const part of (req.headers.cookie || "").split(";")) {
-    const [k, ...v] = part.trim().split("=");
-    if (k === name) return decodeURIComponent(v.join("="));
-  }
-  return null;
-}
-
-// Freno a fuerza bruta: 10 intentos fallidos por IP cada 15 min.
-const attempts = new Map();
-function tooManyAttempts(ip) {
-  const now = Date.now();
-  const list = (attempts.get(ip) || []).filter((t) => now - t < 15 * 60 * 1000);
-  attempts.set(ip, list);
-  return list.length >= 10;
-}
-
-router.post("/login", (req, res) => {
-  if (!secret()) return res.status(503).json({ error: "Panel desactivado: falta ADMIN_PASSWORD en .env" });
-  if (tooManyAttempts(req.ip)) return res.status(429).json({ error: "Demasiados intentos. Espera unos minutos." });
-
-  const given = Buffer.from(String(req.body?.password || ""));
-  const real = Buffer.from(secret());
-  const ok = given.length === real.length && crypto.timingSafeEqual(given, real);
-  if (!ok) {
-    attempts.get(req.ip).push(Date.now());
-    return res.status(401).json({ error: "Contraseña incorrecta" });
-  }
-  res.setHeader("Set-Cookie", `${COOKIE}=${makeToken()}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_MS / 1000}`);
-  res.json({ ok: true });
-});
-
-router.post("/logout", (req, res) => {
-  res.setHeader("Set-Cookie", `${COOKIE}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0`);
-  res.json({ ok: true });
-});
-
-function requireAdmin(req, res, next) {
-  if (!validToken(readCookie(req, COOKIE))) return res.status(401).json({ error: "No autorizado" });
-  next();
-}
+router.post("/login", (req, res) => auth.login(req, res));
+router.post("/logout", (req, res) => auth.logout(req, res));
 
 // ---------------------------------------------------------------------------
 // Utilidades de rango y datos
@@ -93,17 +38,24 @@ function localDays(since, now) {
   return [...new Set(out)];
 }
 
+// Se agrupa por día local en JavaScript y no en SQL: el desfase horario puede
+// cambiar dentro del rango (horario de verano) y un único modificador movería
+// el corte de medianoche de los días anteriores al cambio.
 function dailySeries(since, now) {
   const rows = db
-    .prepare(
-      `SELECT date(created_at, ?) AS day,
-              COALESCE(SUM(CASE WHEN from_cache = 0 THEN char_count END), 0) AS generated,
-              COALESCE(SUM(CASE WHEN from_cache = 1 THEN char_count END), 0) AS cached,
-              COALESCE(SUM(CASE WHEN from_cache = 0 THEN 1 END), 0) AS generations
-       FROM usage_log WHERE created_at >= ? GROUP BY day`
-    )
-    .all(tzu.sqlDayModifier(), tzu.sqlTime(since));
-  const byDay = new Map(rows.map((r) => [r.day, r]));
+    .prepare("SELECT created_at, char_count, from_cache FROM usage_log WHERE created_at >= ?")
+    .all(tzu.sqlTime(since));
+  const byDay = new Map();
+  for (const r of rows) {
+    const day = tzu.localDate(Date.parse(r.created_at.replace(" ", "T") + "Z"));
+    const acc = byDay.get(day) || { generated: 0, cached: 0, generations: 0 };
+    if (r.from_cache) acc.cached += r.char_count;
+    else {
+      acc.generated += r.char_count;
+      acc.generations += 1;
+    }
+    byDay.set(day, acc);
+  }
   return localDays(since, now).map((day) => ({
     day,
     generated: byDay.get(day)?.generated || 0,
@@ -112,10 +64,6 @@ function dailySeries(since, now) {
   }));
 }
 
-function monthStart(now) {
-  const p = tzu.parts(now);
-  return tzu.zonedToUtc(p.y, p.m, 1, 0, 0);
-}
 
 // Turnos enriquecidos con horario (llegada tarde) y breaks.
 function enrichShifts(list) {
@@ -225,7 +173,7 @@ router.get("/summary", requireAdmin, async (req, res) => {
     .get(tzu.sqlTime(dayStart)).n;
   const charsMonth = db
     .prepare("SELECT COALESCE(SUM(char_count), 0) AS n FROM usage_log WHERE from_cache = 0 AND created_at >= ?")
-    .get(tzu.sqlTime(monthStart(now))).n;
+    .get(tzu.sqlTime(tzu.startOfLocalMonth(now))).n;
 
   const plan = await elevenLabsSubscription();
 
@@ -386,7 +334,7 @@ router.get("/elevenlabs", requireAdmin, async (req, res) => {
     .all();
 
   // Acumulado del mes en curso y proyección a fin de mes.
-  const mStart = monthStart(now);
+  const mStart = tzu.startOfLocalMonth(now);
   const monthDaily = dailySeries(mStart, now);
   let acc = 0;
   const cumulative = monthDaily.map((d) => ({ day: d.day, total: (acc += d.generated) }));
@@ -473,6 +421,33 @@ router.put("/schedules/:discordId", requireAdmin, (req, res) => {
 
 router.delete("/schedules/:discordId", requireAdmin, (req, res) => {
   db.prepare("DELETE FROM schedules WHERE discord_id = ?").run(String(req.params.discordId));
+  res.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// Cerrar un turno que quedó abierto (alguien se fue sin pulsar End)
+// ---------------------------------------------------------------------------
+
+router.post("/shifts/:id/close", requireAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  const shift = db.prepare("SELECT * FROM shifts WHERE id = ?").get(id);
+  if (!shift) return res.status(404).json({ error: "Turno no encontrado" });
+  if (shift.ended_at) return res.status(409).json({ error: "Ese turno ya está cerrado" });
+
+  const now = Date.now();
+  // Si se puede, se cierra en la hora indicada por el manager; si no, ahora.
+  let endAt = now;
+  if (req.body?.endedAt != null) {
+    endAt = Number(req.body.endedAt);
+    if (!Number.isFinite(endAt) || endAt <= shift.started_at || endAt > now) {
+      return res.status(400).json({ error: "La hora de cierre debe estar entre el inicio del turno y ahora" });
+    }
+  }
+  // Un break sin cerrar se cierra también, para que el tiempo trabajado cuadre.
+  db.prepare("UPDATE shift_breaks SET ended_at = ? WHERE shift_id = ? AND ended_at IS NULL AND started_at <= ?")
+    .run(endAt, id, endAt);
+  db.prepare("UPDATE shift_breaks SET ended_at = started_at WHERE shift_id = ? AND ended_at IS NULL").run(id);
+  db.prepare("UPDATE shifts SET ended_at = ? WHERE id = ?").run(endAt, id);
   res.json({ ok: true });
 });
 
