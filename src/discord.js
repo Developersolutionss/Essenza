@@ -101,8 +101,25 @@ async function replyWithAudio(interaction, chatter, modelId, text) {
 // comando, así que los de manager se vuelven a comprobar al ejecutarlos.
 const MANAGER_COMMANDS = new Set(["vincular", "panel-fichajes"]);
 
+// Los nombres de rol llevan emojis y letras decorativas ("💬 𝗖𝗛𝗔𝗧𝗧𝗜𝗡𝗚"): se normalizan
+// a texto plano para compararlos.
+function normRole(s) {
+  return String(s || "").normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+}
+
+// Roles que nunca pueden usar los comandos de manager, aunque el servidor les haya
+// ampliado el permiso del comando. Se ajusta con BLOCKED_ROLES (separados por comas).
+const BLOCKED_ROLES = () =>
+  (process.env.BLOCKED_ROLES || "chatting,chatter").split(",").map(normRole).filter(Boolean);
+
 function isManager(interaction) {
-  return Boolean(interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild));
+  const perms = interaction.memberPermissions;
+  if (!perms?.has(PermissionFlagsBits.ManageGuild)) return false;
+  // Un administrador del servidor siempre puede.
+  if (perms.has(PermissionFlagsBits.Administrator)) return true;
+  const blocked = BLOCKED_ROLES();
+  const roles = interaction.member?.roles?.cache ? [...interaction.member.roles.cache.values()] : [];
+  return !roles.some((r) => blocked.includes(normRole(r.name)));
 }
 
 async function handleCommand(interaction) {
@@ -226,4 +243,4 @@ async function startDiscordBot() {
   await client.login(token);
 }
 
-module.exports = { startDiscordBot };
+module.exports = { startDiscordBot, isManager, normRole };
