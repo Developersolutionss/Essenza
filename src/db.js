@@ -148,9 +148,9 @@ if (!shiftCols.includes("plan_source")) db.exec("ALTER TABLE shifts ADD COLUMN p
 if (db.prepare("SELECT COUNT(*) AS n FROM shift_templates").get().n === 0) {
   const grace = Number(process.env.LATE_GRACE_MINUTES || 10);
   const ins = db.prepare("INSERT INTO shift_templates (name, start_time, grace_minutes) VALUES (?, ?, ?)");
-  ins.run("Shift 1", "05:00", grace);
+  ins.run("Shift 1", "05:30", grace);
   ins.run("Shift 2", "13:00", grace);
-  ins.run("Shift 3", "21:00", grace);
+  ins.run("Shift 3", "21:15", grace);
 }
 
 // Migración: vincular cada chatter con su usuario de Discord.

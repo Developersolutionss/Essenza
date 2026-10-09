@@ -83,14 +83,13 @@ suelto; el canal normal de los chatters es Discord.
 
 ## Turnos y puntualidad
 
-La agencia trabaja en hora de Venezuela (`TIMEZONE=America/Caracas`) con tres turnos
-de 8 horas:
+La agencia trabaja en hora de Venezuela (`TIMEZONE=America/Caracas`) con tres turnos:
 
 | Turno | Entrada | Salida |
 |---|---|---|
-| Shift 1 | 05:00 | 13:00 |
-| Shift 2 | 13:00 | 21:00 |
-| Shift 3 | 21:00 | 05:00 |
+| Shift 1 | 05:30 | 13:00 |
+| Shift 2 | 13:00 | 21:15 |
+| Shift 3 | 21:15 | 05:30 |
 
 Nadie se configura uno por uno. Al pulsar **Start**, el bot decide el turno por este orden:
 
@@ -101,7 +100,7 @@ Nadie se configura uno por uno. Al pulsar **Start**, el bot decide el turno por 
 3. **Cargo exento**: Team Leader, Jefe de Chat y Content Manager (`EXEMPT_ROLES`) no siguen
    un turno fijo y no se miden.
 4. **Por la hora de Start**: se toma el turno cuyo inicio queda más cerca. No hace falta tocar
-   ningún nombre. Límite: con turnos separados 8 h, un retraso de más de 4 h se lee como
+   ningún nombre. Límite: con turnos separados unas 8 h, un retraso de más de unas 4 h se lee como
    haber llegado antes al turno siguiente; para esos casos conviene el turno en el apodo.
 
 El bot responde a quien ficha con su turno, de cuál de los métodos salió y si llegó a tiempo
