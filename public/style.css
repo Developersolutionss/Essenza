@@ -40,4 +40,4 @@ main { display: grid; gap: var(--sp-4); }
 .login-card { width: 100%; max-width: 360px; display: grid; gap: var(--sp-4); padding: var(--sp-5); }
 .login-card .brand { justify-content: center; font-size: 1.5rem; }
 .login-title { font: 500 var(--fs-sm) var(--font-text); text-align: center; color: var(--fg-muted); margin-top: calc(var(--sp-2) * -1); }
-.foot { display: flex; justify-content: flex-end; }
+.foot { display: flex; justify-content: flex-end; gap: var(--sp-2); flex-wrap: wrap; }

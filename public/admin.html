@@ -16,6 +16,7 @@
     href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@400;500;600;700&display=swap"
     rel="stylesheet"
   />
+  <script src="/theme.js"></script>
   <link rel="stylesheet" href="ds.css" />
   <link rel="stylesheet" href="admin.css" />
 </head>
@@ -36,16 +37,20 @@
         <p id="loginError" class="field-error" role="alert"></p>
       </div>
       <button type="submit" class="btn primary">Entrar</button>
+      <button type="button" class="btn ghost sm theme-toggle " data-theme-toggle aria-pressed="false"><svg class="ic" data-icon-moon viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg><svg class="ic" data-icon-sun hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg><span data-theme-label>Modo oscuro</span></button>
     </form>
   </section>
 
   <div id="app" class="shell" hidden>
     <header class="mobile-top">
       <div class="brand"><img class="logo" src="/logo-128.png" alt="" width="32" height="32" />Essensa</div>
+      <div class="mobile-actions">
+        <button type="button" class="btn ghost sm theme-toggle " data-theme-toggle aria-pressed="false"><svg class="ic" data-icon-moon viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg><svg class="ic" data-icon-sun hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg><span data-theme-label class="sr-only">Modo oscuro</span></button>
       <button type="button" class="btn ghost sm js-logout">
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
         Salir
       </button>
+      </div>
     </header>
 
     <aside class="side">
@@ -76,6 +81,7 @@
         <div class="whoami" id="whoami"></div>
         <div class="clock" id="clock" aria-hidden="true">--:--</div>
         <div class="tz" id="tz"></div>
+        <button type="button" class="btn ghost sm theme-toggle " data-theme-toggle aria-pressed="false"><svg class="ic" data-icon-moon viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg><svg class="ic" data-icon-sun hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg><span data-theme-label>Modo oscuro</span></button>
         <button type="button" class="btn ghost sm js-logout">
           <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
           Cerrar sesión

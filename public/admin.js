@@ -9,8 +9,8 @@ const nf = new Intl.NumberFormat("es");
 const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /* Colores de gráficas (RGB para poder derivar tramas y transparencias). */
-const RGB = { cost: "184,134,11", saved: "21,128,61", danger: "220,38,38", info: "87,83,78" };
-const COL = { cost: "#b8860b", saved: "#15803d", danger: "#dc2626", info: "#57534e", fg: "#1c1917", muted: "#6b5f2a", grid: "rgba(138,122,58,.22)", surface: "#ffffff", track: "#f3ebc8" };
+const RGB = { cost: "", saved: "", danger: "", info: "" };
+const COL = { cost: "", saved: "", danger: "", info: "", fg: "", muted: "", grid: "", surface: "", track: "" };
 
 const TITLES = { resumen: "Resumen", fichajes: "Fichajes", elevenlabs: "ElevenLabs", cuentas: "Cuentas", horarios: "Horarios" };
 const RANGES = [["today", "Hoy"], ["7", "7 días"], ["30", "30 días"], ["90", "90 días"]];
@@ -115,19 +115,47 @@ const announce = (msg) => {
 
 /* ---------- Gráficas ---------- */
 
-if (window.Chart) {
+// Los colores de las gráficas salen de las variables CSS del tema activo.
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+function hexToRgb(hex) {
+  const h = hex.replace("#", "");
+  return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)).join(",");
+}
+
+function applyChartTheme() {
+  Object.assign(COL, {
+    cost: cssVar("--c-cost"),
+    saved: cssVar("--c-saved"),
+    danger: cssVar("--c-danger"),
+    info: cssVar("--c-info"),
+    fg: cssVar("--c-fg"),
+    muted: cssVar("--c-muted"),
+    grid: cssVar("--c-grid"),
+    surface: cssVar("--surface"),
+    track: cssVar("--c-track"),
+  });
+  Object.assign(RGB, {
+    cost: hexToRgb(COL.cost),
+    saved: hexToRgb(COL.saved),
+    danger: hexToRgb(COL.danger),
+    info: hexToRgb(COL.info),
+  });
+  if (!window.Chart) return;
   Chart.defaults.color = COL.muted;
   Chart.defaults.font.family = "'Fira Code', ui-monospace, Consolas, monospace";
   Chart.defaults.font.size = 12;
   Chart.defaults.borderColor = COL.grid;
   const tt = Chart.defaults.plugins.tooltip;
-  tt.backgroundColor = "#1c1917";
-  tt.borderColor = "#1c1917";
+  tt.backgroundColor = cssVar("--c-tip-bg");
+  tt.borderColor = cssVar("--c-tip-bg");
   tt.borderWidth = 1;
   tt.padding = 10;
-  tt.titleColor = "#ffffff";
-  tt.bodyColor = "#fef3c7";
+  tt.titleColor = cssVar("--c-tip-fg");
+  tt.bodyColor = cssVar("--c-tip-fg");
 }
+applyChartTheme();
 
 /* Trama rayada: distingue una serie sin depender solo del color. */
 function hatch(rgb) {
@@ -1042,6 +1070,12 @@ async function boot() {
 /* ---------- Eventos ---------- */
 
 window.addEventListener("hashchange", go);
+
+// Al cambiar de tema se recalculan los colores de las gráficas y se repintan.
+document.addEventListener("themechange", () => {
+  applyChartTheme();
+  if (!$("#app").hidden) load({ silent: true });
+});
 
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) return clearTimeout(state.timer);
