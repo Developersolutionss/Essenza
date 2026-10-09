@@ -32,7 +32,10 @@ instante en ese servidor).
 
 Comandos: `/voz modelo texto`, `/frase modelo frase`, `/uso`, `/vincular`,
 `/panel-fichajes`. Los dos últimos exigen el permiso Gestionar servidor, que se
-comprueba también al ejecutarlos. Las respuestas son efímeras (solo las ve quien
+comprueba también al ejecutarlos, y además se niegan a quien tenga un rol bloqueado
+(`BLOCKED_ROLES`, por defecto `chatting` y `chatter`; se compara el nombre completo del
+rol sin emojis ni letras decorativas). Un administrador del servidor siempre puede.
+Las respuestas son efímeras (solo las ve quien
 las pidió) y el mp3 va adjunto.
 
 ## Fichajes
