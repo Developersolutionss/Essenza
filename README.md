@@ -19,6 +19,27 @@ Panel de administración en `http://localhost:3000/admin`.
 La primera vez, `ADMIN_PASSWORD` crea la cuenta `admin`. A partir de ahí las
 cuentas se gestionan desde el panel y esa variable ya no se usa para entrar.
 
+## Pruebas
+
+```
+npm test                    # lógica del servidor, unas 180 comprobaciones, ~10 s
+npm test -- turnos          # solo los archivos cuyo nombre contenga "turnos"
+npm run test:browser        # interfaz real en un navegador, ~3 min
+npm run test:all            # las dos
+```
+
+Las pruebas **no tocan tus datos ni gastan créditos**: cada una usa una base de datos
+temporal, un proveedor de voz falso y no conecta con Discord ni con ElevenLabs.
+
+- `tests/server/` cubre la generación (caché, cuota y pedidos simultáneos), el acceso
+  (sesiones, roles, cookies falsificadas), los fichajes, la asignación de turnos, las
+  duraciones y los permisos de Discord.
+- `tests/browser/` abre el panel en Chrome, Edge o Chromium (o el que indique `CHROME_PATH`)
+  y comprueba orden de tablas, formularios, roles, modo oscuro, zonas horarias y el
+  contraste de todos los textos en ambos modos.
+
+Antes de subir un cambio, ejecuta `npm test`. Si tocas la interfaz, también `npm run test:browser`.
+
 ## Bot de Discord
 
 Los chatters generan los audios desde Discord. El bot corre dentro del mismo
