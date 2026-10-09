@@ -71,11 +71,19 @@ const start = (id, names, when) => s.startShift(id, id, when, plans.resolveForSt
   // Sin turno: duración general (8 h)
   start("h", ["Steban - (Team Leader)"], at(9, 8, 0));
   const hRow = db.prepare("SELECT * FROM shifts WHERE discord_id='h'").get();
-  ok("cargo exento: sin duración propia, exige 8 h", hRow.required_minutes === null && s.statusOf("h", at(9, 8, 0)).requiredMs === 8 * 3600e3);
-  ok("exento sale a las 16:00", !s.endShift("h", at(9, 15, 59)).ok && s.endShift("h", at(9, 16, 0)).ok);
+  ok("cargo directivo: exige 10 h", hRow.required_minutes === 600 && s.statusOf("h", at(9, 8, 0)).requiredMs === 10 * 3600e3, `guarda ${hRow.required_minutes} min`);
+  ok("el directivo sale a las 18:00, a las 10 h de su Start", !s.endShift("h", at(9, 17, 59)).ok && s.endShift("h", at(9, 18, 0)).ok);
+  start("j", ["Dio - (Jefe de Chat)"], at(9, 9, 0));
+  s.startBreak("j", at(9, 12, 0)); s.endBreak("j", at(9, 12, 30));
+  ok("directivo con 30 min de break: sale igual a las 10 h", !s.endShift("j", at(9, 18, 59)).ok && s.endShift("j", at(9, 19, 0)).ok);
+  start("k", ["Felix - (Content Manager)"], at(9, 9, 0));
+  s.startBreak("k", at(9, 12, 0)); s.endBreak("k", at(9, 12, 45));
+  ok("directivo con 45 min de break: recupera los 15 y sale a las 19:15", !s.endShift("k", at(9, 19, 0)).ok && s.endShift("k", at(9, 19, 15)).ok);
+  start("l", ["Dio - Shift 2 (Jefe de Chat)"], at(9, 13, 0));
+  ok("directivo con Shift en el apodo: gana el turno (8 h 15 min)", s.statusOf("l", at(9, 13, 0)).requiredMs === 495 * M);
   db.prepare("INSERT INTO schedules VALUES ('p1','Personal','09:00',5)").run();
   start("p1", ["Personal"], at(9, 9, 0));
-  ok("horario personal: duración general de 8 h", s.statusOf("p1", at(9, 9, 0)).requiredMs === 8 * 3600e3);
+  ok("horario personal: duración general de 8 h (sin ser directivo)", s.statusOf("p1", at(9, 9, 0)).requiredMs === 8 * 3600e3);
 
   // Cambiar un turno no afecta a quien ya está dentro
   start("i", ["Iris - Shift 2"], at(9, 13, 0));

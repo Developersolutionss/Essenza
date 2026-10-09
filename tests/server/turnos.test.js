@@ -99,7 +99,7 @@ const lateMin = (pl, when) => (pl && pl.expectedAt != null ? Math.round((when - 
   ok("cambiar un turno NO reescribe fichajes pasados", db.prepare("SELECT expected_at FROM shifts WHERE discord_id='u3'").get().expected_at === pl.expectedAt);
   db.prepare("UPDATE shift_templates SET start_time = '13:00' WHERE name = 'Shift 2'").run();
   const ex1 = shifts.startShift("u4", "Steban", at(9, 8, 0), plan(["Steban - (Team Leader)"], at(9, 8, 0), "u4"));
-  ok("un exento se guarda sin hora esperada y con su origen", ex1.shift.expected_at === null && ex1.shift.plan_source === "exento");
+  ok("un directivo se guarda sin hora esperada, con su origen y 10 h", ex1.shift.expected_at === null && ex1.shift.plan_source === "exento" && ex1.shift.required_minutes === 600);
 
   /* --- Mensajes del bot --- */
   db.prepare("DELETE FROM shifts").run();
@@ -107,7 +107,7 @@ const lateMin = (pl, when) => (pl && pl.expectedAt != null ? Math.round((when - 
   ok("mensaje por hora: dice que se dedujo y trae la hora en el reloj de cada uno", /deducido por tu hora de entrada/.test(mA) && /<t:\d+:t>/.test(mA), mA.split("\n").slice(-1)[0].slice(0, 160));
   ok("el mensaje conserva la referencia en hora de Venezuela", /\(\d\d:\d\d, hora de Venezuela\)/.test(mA));
   const mB = runAction("start", "m2", "Steban", ["Steban - (Team Leader)"]);
-  ok("mensaje de exento: no se mide la puntualidad", /no se mide tu puntualidad/.test(mB) && !/Llegaste/.test(mB), mB.split("\n").slice(-1)[0].slice(0, 100));
+  ok("mensaje de directivo: no se mide la puntualidad y dice la jornada de 10 h", /no se mide tu puntualidad/.test(mB) && /10 h/.test(mB) && !/Llegaste/.test(mB), mB.split("\n").slice(-1)[0].slice(0, 100));
   const mC = runAction("start", "m3", "Alejandro", ["Alejandro - Shift 2 (Chatter)"]);
   ok("mensaje por apodo: no dice 'deducido'", /Shift 2/.test(mC) && !/deducido/.test(mC));
   ok("Start dos veces avisa y no duplica", /Ya tienes un turno abierto/.test(runAction("start", "m3", "Alejandro", ["Alejandro - Shift 2 (Chatter)"])));

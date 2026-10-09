@@ -7,7 +7,8 @@ const tzu = require("./timezone");
 //   1. Horario personal (tabla schedules): para quien no sigue su turno.
 //   2. Apodo del servidor con el turno escrito ("Alejandro - Shift 2 (Chatter)"),
 //      o un rol con ese nombre. Detecta retrasos de cualquier tamaño.
-//   3. Cargo exento (Team Leader, Jefe de Chat...): no se mide la puntualidad.
+//   3. Cargo directivo (Team Leader, Jefe de Chat...): no se mide la puntualidad y
+//      cumple 10 h (EXEMPT_HOURS) en lugar de la duración de un turno.
 //   4. Por la hora de Start: se toma el inicio de turno más cercano. Funciona sin
 //      tocar nombres, pero con turnos separados 8 h un retraso de más de 4 h se
 //      confunde con llegar antes al turno siguiente.
@@ -49,6 +50,9 @@ function nameMatches(text, templateName) {
 // Cargos que no siguen un turno fijo y por tanto no se miden en puntualidad.
 const EXEMPT_ROLES = () =>
   (process.env.EXEMPT_ROLES || "team leader,jefe de chat,content manager").split(",").map(normalize).filter(Boolean);
+
+// Los cargos directivos no siguen un turno fijo, pero cumplen una jornada más larga.
+const exemptMinutes = () => Math.round(Number(process.env.EXEMPT_HOURS || 10) * 60);
 
 function isExempt(names) {
   const terms = EXEMPT_ROLES();
@@ -104,7 +108,9 @@ function resolveForStart({ discordId, names = [], startedAt }) {
   }
 
   // 3) Cargos que no siguen turno.
-  if (isExempt(texts)) return { source: "exento", templateName: null, startTime: null, graceMin: null, expectedAt: null };
+  if (isExempt(texts)) {
+    return { source: "exento", templateName: null, startTime: null, graceMin: null, durationMin: exemptMinutes(), expectedAt: null };
+  }
 
   // 4) Por la hora de Start. Con un solo turno no hay forma de distinguir, así que no se mide.
   if (templates.length < 2) return null;
@@ -113,4 +119,4 @@ function resolveForStart({ discordId, names = [], startedAt }) {
   return options[0];
 }
 
-module.exports = { listTemplates, resolveForStart, nameMatches, normalize, isExempt, tzLabel, DEFAULT_GRACE };
+module.exports = { listTemplates, resolveForStart, nameMatches, normalize, isExempt, exemptMinutes, tzLabel, DEFAULT_GRACE };

@@ -593,7 +593,7 @@ views.fichajes = {
   render(d) {
     const k = d.kpis;
     const noSched = k.unscheduled
-      ? `<div class="note section">${ic("info")}<span>${k.unscheduled} persona(s) sin medir (cargos exentos o sin turno posible): no se mide su puntualidad.</span>${state.user?.role === "admin" ? '<a href="#horarios">Ver turnos</a>' : ""}</div>`
+      ? `<div class="note section">${ic("info")}<span>${k.unscheduled} persona(s) sin medir en puntualidad (cargos directivos o sin turno posible). Los directivos cumplen una jornada más larga.</span>${state.user?.role === "admin" ? '<a href="#horarios">Ver turnos</a>' : ""}</div>`
       : "";
 
     const lateTbl = d.late.length
@@ -990,7 +990,7 @@ views.horarios = {
     const html = `
       ${head("Horarios", `Hora de entrada esperada · ${esc(d.tzLabel)} (<b class="mono">${esc(d.tz)}</b>)`)}
 
-      <div class="note section">${ic("info")}<span>Nadie se configura uno por uno. Al pulsar <b>Start</b> el bot decide el turno, por este orden: <b>1)</b> su horario personal, si lo tiene; <b>2)</b> el turno escrito en su apodo del servidor (por ejemplo <b>Alejandro - Shift 2</b>); <b>3)</b> si su cargo es Team Leader, Jefe de Chat o Content Manager, no se mide; <b>4)</b> si nada de lo anterior, <b>por la hora a la que ficha</b>: el turno cuyo inicio queda más cerca. Con la hora sola, un retraso de más de 4 horas se confunde con llegar antes al turno siguiente: para esos casos conviene el turno en el apodo.</span></div>
+      <div class="note section">${ic("info")}<span>Nadie se configura uno por uno. Al pulsar <b>Start</b> el bot decide el turno, por este orden: <b>1)</b> su horario personal, si lo tiene; <b>2)</b> el turno escrito en su apodo del servidor (por ejemplo <b>Alejandro - Shift 2</b>); <b>3)</b> si su cargo es Team Leader, Jefe de Chat o Content Manager, no se mide la puntualidad y cumple una jornada de <b>10 horas</b>; <b>4)</b> si nada de lo anterior, <b>por la hora a la que ficha</b>: el turno cuyo inicio queda más cerca. Con la hora sola, un retraso de más de 4 horas se confunde con llegar antes al turno siguiente: para esos casos conviene el turno en el apodo.</span></div>
 
       <section class="panel section" aria-labelledby="h-tpl"><div class="head"><h2 id="h-tpl">Turnos</h2></div>
         <p class="sub">La puntualidad se mide frente a la entrada, más los minutos de gracia. <b>End</b> se habilita al cumplir la duración del turno, contada desde que la persona pulsa Start (el break permitido cuenta). Cambiar un turno no modifica los fichajes ya iniciados.</p>

@@ -67,7 +67,8 @@ turno o en break, y lo fija en el canal.
 
 - Para pulsar **End** hay que cumplir la duración del propio turno (ver la tabla de turnos),
   contada desde que se pulsa Start: quien llega tarde sale más tarde. Quien no tiene turno
-  (cargos exentos, horario personal) cumple la duración general, `SHIFT_HOURS` (8 h).
+  con horario personal cumple la duración general, `SHIFT_HOURS` (8 h). Los cargos
+  directivos (ver abajo) cumplen `EXEMPT_HOURS` (10 h).
 - El break de 30 min es tiempo pagado y cuenta como trabajado: no hay que recuperarlo.
   Solo el exceso se descuenta, y ese sí hay que recuperarlo antes de poder pulsar End.
 - Hay **un solo break por turno**, de 30 min. El exceso queda marcado en el panel web.
@@ -126,8 +127,9 @@ Nadie se configura uno por uno. Al pulsar **Start**, el bot decide el turno por 
 2. **Turno escrito en el apodo del servidor**, por ejemplo `Alejandro - Shift 2 (Chatter)`.
    Valen variantes como `shift2` o `SHIFT-2`; si el apodo no lo trae, se prueba con el
    nombre global y con los roles. Detecta retrasos de cualquier tamaño.
-3. **Cargo exento**: Team Leader, Jefe de Chat y Content Manager (`EXEMPT_ROLES`) no siguen
-   un turno fijo y no se miden.
+3. **Cargo directivo**: Team Leader, Jefe de Chat y Content Manager (`EXEMPT_ROLES`) no siguen
+   un turno fijo: no se miden en puntualidad y cumplen **10 horas** (`EXEMPT_HOURS`). Un
+   Shift en el apodo o un horario personal tiene prioridad sobre esta regla.
 4. **Por la hora de Start**: se toma el turno cuyo inicio queda más cerca. No hace falta tocar
    ningún nombre. Límite: con turnos separados unas 8 h, un retraso de más de unas 4 h se lee como
    haber llegado antes al turno siguiente; para esos casos conviene el turno en el apodo.

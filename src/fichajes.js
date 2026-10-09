@@ -125,7 +125,7 @@ function runAction(action, discordId, name, names = []) {
         `(el break de ${fmt(shifts.BREAK_MS)} cuenta; solo se suma lo que te pases).`;
 
       if (plan?.source === "exento") {
-        msg += "\nℹ️ Tu cargo no sigue un turno fijo, así que no se mide tu puntualidad.";
+        msg += `\nℹ️ Tu cargo no sigue un turno fijo, así que no se mide tu puntualidad. Tu jornada es de **${fmt(requiredMs)}**.`;
       } else if (plan) {
         const quien =
           plan.source === "personal" ? "tu horario personal" : `**${plan.templateName}**`;
