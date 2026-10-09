@@ -3,7 +3,6 @@
 .app { max-width: 560px; margin: 0 auto; padding: var(--sp-5) var(--sp-4) var(--sp-6); display: grid; gap: var(--sp-4); }
 
 .brand { display: flex; align-items: center; gap: 10px; font: 700 var(--fs-lg) var(--font-data); letter-spacing: -0.02em; }
-.mark { width: 14px; height: 14px; background: var(--accent); border-radius: 3px; transform: rotate(45deg); flex: none; }
 
 .top { display: grid; gap: var(--sp-2); }
 .top h1 { font: 600 var(--fs-xl) var(--font-data); letter-spacing: -0.03em; margin-top: var(--sp-3); }

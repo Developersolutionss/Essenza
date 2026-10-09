@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="color-scheme" content="dark" />
   <title>Essensa · Panel</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
+  <link rel="shortcut icon" href="/favicon.ico" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <meta name="theme-color" content="#0f172a" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
@@ -19,7 +24,7 @@
 
   <section id="login" class="login" hidden aria-labelledby="login-title">
     <form id="loginForm" class="panel login-card" novalidate>
-      <div class="brand"><span class="mark" aria-hidden="true"></span>Essensa</div>
+      <div class="brand"><img class="logo" src="/logo-128.png" alt="" width="32" height="32" />Essensa</div>
       <h1 id="login-title" class="login-title">Panel de administración</h1>
       <div class="field">
         <label for="username">Usuario</label>
@@ -36,7 +41,7 @@
 
   <div id="app" class="shell" hidden>
     <header class="mobile-top">
-      <div class="brand"><span class="mark" aria-hidden="true"></span>Essensa</div>
+      <div class="brand"><img class="logo" src="/logo-128.png" alt="" width="32" height="32" />Essensa</div>
       <button type="button" class="btn ghost sm js-logout">
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
         Salir
@@ -44,7 +49,7 @@
     </header>
 
     <aside class="side">
-      <div class="brand"><span class="mark" aria-hidden="true"></span>Essensa</div>
+      <div class="brand"><img class="logo" src="/logo-128.png" alt="" width="32" height="32" />Essensa</div>
       <nav id="nav" aria-label="Secciones">
         <a href="#resumen" data-route="resumen">
           <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>

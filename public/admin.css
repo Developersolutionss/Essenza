@@ -3,7 +3,6 @@
 
 /* ---------- Marca ---------- */
 .brand { display: flex; align-items: center; gap: 10px; font: 700 var(--fs-lg) var(--font-data); letter-spacing: -0.02em; }
-.mark { width: 14px; height: 14px; background: var(--accent); border-radius: 3px; transform: rotate(45deg); flex: none; }
 
 /* ---------- Estructura ---------- */
 .shell { display: grid; grid-template-columns: 224px 1fr; min-height: 100vh; align-content: start; }

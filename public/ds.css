@@ -189,3 +189,7 @@ th[aria-sort="descending"] .th-btn .ic { transform: rotate(180deg); }
 
 .skeleton { border-radius: var(--radius); background: linear-gradient(90deg, var(--surface), var(--surface-2), var(--surface)); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
 @keyframes shimmer { to { background-position: -200% 0; } }
+
+/* ---------- Logo ---------- */
+.logo { display: block; height: 30px; width: auto; flex: none; object-fit: contain; }
+.brand.big .logo, .login-card .brand .logo { height: 48px; }
