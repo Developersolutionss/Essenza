@@ -26,7 +26,7 @@ const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || "127.0.0.1";
 
 app.listen(PORT, HOST, () => {
-  console.log(`Essensa voice notes corriendo en http://${HOST}:${PORT}`);
+  console.log(`Essenza voice notes corriendo en http://${HOST}:${PORT}`);
   if (HOST === "0.0.0.0") {
     console.warn("AVISO: el servidor escucha en todas las interfaces. Usa un proxy con HTTPS delante.");
   }

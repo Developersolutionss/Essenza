@@ -1,5 +1,5 @@
 "use strict";
-/* Panel de administración Essensa.
+/* Panel de administración Essenza.
    Sin dependencias salvo Chart.js (servido localmente). Estilos en ds.css y admin.css. */
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -1177,7 +1177,7 @@ function go() {
   if (soloAdmin.has(state.route) && state.user?.role !== "admin") state.route = "resumen";
   state.animate = true;
   state.sort = {};
-  document.title = `${TITLES[state.route]} · Essensa`;
+  document.title = `${TITLES[state.route]} · Essenza`;
   document.querySelectorAll("#nav a").forEach((a) => {
     if (a.dataset.route === state.route) a.setAttribute("aria-current", "page");
     else a.removeAttribute("aria-current");
@@ -1192,7 +1192,7 @@ function showLogin() {
   state.user = null;
   $("#login").hidden = false;
   $("#app").hidden = true;
-  document.title = "Acceso · Essensa";
+  document.title = "Acceso · Essenza";
   setTimeout(() => $("#username").focus(), 0);
 }
 

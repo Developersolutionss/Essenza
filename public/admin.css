@@ -25,7 +25,9 @@
 .tz { color: var(--fg-muted); font: 400 var(--fs-xs) var(--font-data); margin-bottom: var(--sp-2); }
 .mobile-top { display: none; }
 
-.main { padding: var(--sp-5) clamp(var(--sp-4), 2.6vw, 40px) 64px; min-width: 0; max-width: 1560px; width: 100%; }
+/* Ancho máximo para que tablas y gráficas no se estiren sin fin en pantallas muy
+   anchas (o con el zoom muy reducido); el bloque queda centrado en el espacio libre. */
+.main { padding: var(--sp-5) clamp(var(--sp-4), 2.6vw, 40px) 64px; min-width: 0; max-width: 1760px; width: 100%; margin-inline: auto; }
 
 /* ---------- Barra de estado en vivo ---------- */
 .statusbar { display: flex; justify-content: flex-end; align-items: center; gap: var(--sp-2); flex-wrap: wrap; margin-bottom: var(--sp-3); min-height: 32px; }

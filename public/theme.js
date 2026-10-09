@@ -52,7 +52,7 @@
     paint(theme, true);
   }
 
-  window.EssensaTheme = {
+  window.EssenzaTheme = {
     current: current,
     toggle: function () {
       set(current() === "dark" ? "light" : "dark");
@@ -64,7 +64,7 @@
     paint(current(), false);
     document.querySelectorAll("[data-theme-toggle]").forEach(function (b) {
       b.addEventListener("click", function () {
-        window.EssensaTheme.toggle();
+        window.EssenzaTheme.toggle();
       });
     });
   });

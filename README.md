@@ -1,4 +1,4 @@
-# Essensa — Generador de audios con voz clonada
+# Essenza — Generador de audios con voz clonada
 
 Herramienta interna para que los chatters generen audios con la voz clonada de
 cada modelo, a partir de texto. Node/Express + SQLite, con caché de frases
