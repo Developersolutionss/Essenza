@@ -64,6 +64,65 @@ const ICONS = {
 const ic = (n) =>
   `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ICONS[n] || ""}</svg>`;
 
+/* ---------- Zona horaria de lectura ----------
+   La puntualidad siempre se mide en la hora de la agencia (Venezuela). Esto solo cambia
+   en qué reloj se LEEN las horas del panel: cada persona elige el suyo. */
+
+const VIEW_KEY = "essensa_view_tz";
+const VIEW_ZONES = [
+  ["local", "Mi zona (la de este navegador)"],
+  ["America/Bogota", "Colombia"],
+  ["America/Argentina/Buenos_Aires", "Argentina"],
+  ["America/Asuncion", "Paraguay"],
+];
+
+function viewChoice() {
+  try {
+    return localStorage.getItem(VIEW_KEY) || "agency";
+  } catch {
+    return "agency";
+  }
+}
+function viewZone() {
+  const c = viewChoice();
+  if (c === "agency") return state.tz;
+  if (c === "local") return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return c;
+}
+function zoneOffset(zone) {
+  try {
+    const part = new Intl.DateTimeFormat("es", { timeZone: zone, timeZoneName: "shortOffset" }).formatToParts(new Date()).find((x) => x.type === "timeZoneName");
+    return part ? part.value.replace("GMT", "UTC") : zone;
+  } catch {
+    return zone;
+  }
+}
+function partsIn(ms, zone) {
+  const f = new Intl.DateTimeFormat("en-US", { timeZone: zone, hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", second: "numeric" });
+  const o = {};
+  for (const x of f.formatToParts(new Date(ms))) o[x.type] = Number(x.value);
+  return { y: o.year, m: o.month, d: o.day, h: o.hour, mi: o.minute, s: o.second };
+}
+function zonedInstant(y, m, d, h, mi, zone) {
+  const offset = (ms) => {
+    const q = partsIn(ms, zone);
+    return Date.UTC(q.y, q.m - 1, q.d, q.h, q.mi, q.s) - Math.floor(ms / 1000) * 1000;
+  };
+  const guess = Date.UTC(y, m - 1, d, h, mi);
+  return guess - offset(guess - offset(guess));
+}
+// Hora de entrada de un turno (HH:MM en la zona de la agencia) vista en la zona elegida.
+function entryInViewZone(hhmm) {
+  const [h, mi] = hhmm.split(":").map(Number);
+  const now = partsIn(Date.now(), state.tz);
+  const ms = zonedInstant(now.y, now.m, now.d, h, mi, state.tz);
+  const vz = viewZone();
+  const time = new Date(ms).toLocaleTimeString("es", { timeZone: vz, hour: "2-digit", minute: "2-digit", hour12: false });
+  const day = (z) => new Date(ms).toLocaleDateString("en-CA", { timeZone: z });
+  const note = day(vz) > day(state.tz) ? " (día siguiente)" : day(vz) < day(state.tz) ? " (día anterior)" : "";
+  return time + note;
+}
+
 /* ---------- Formato ---------- */
 
 function fmtDur(ms) {
@@ -73,8 +132,8 @@ function fmtDur(ms) {
   if (m < 60) return `${m} min`;
   return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")} min`;
 }
-const fmtTime = (ms) => new Date(ms).toLocaleTimeString("es", { timeZone: state.tz, hour: "2-digit", minute: "2-digit", hour12: false });
-const fmtDay = (ms) => new Date(ms).toLocaleDateString("es", { timeZone: state.tz, day: "numeric", month: "short" });
+const fmtTime = (ms) => new Date(ms).toLocaleTimeString("es", { timeZone: viewZone(), hour: "2-digit", minute: "2-digit", hour12: false });
+const fmtDay = (ms) => new Date(ms).toLocaleDateString("es", { timeZone: viewZone(), day: "numeric", month: "short" });
 const fmtDT = (ms) => `${fmtDay(ms)} · ${fmtTime(ms)}`;
 const shortDay = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString("es", { day: "numeric", month: "short" });
 const addDays = (iso, n) => {
@@ -443,7 +502,7 @@ views.resumen = {
     const k = d.kpis;
     const planPct = d.plan.error ? null : pct(d.plan.used, d.plan.limit);
     const html = `
-      ${head("Resumen", new Date(d.now).toLocaleDateString("es", { timeZone: d.tz, weekday: "long", day: "numeric", month: "long" }))}
+      ${head("Resumen", new Date(d.now).toLocaleDateString("es", { timeZone: viewZone(), weekday: "long", day: "numeric", month: "long" }))}
       <div class="kpis">
         ${kpi("users", "En turno ahora", k.openNow, k.onBreakNow ? `${k.onBreakNow} en break` : "nadie en break")}
         ${kpi("clock", "Llegadas tarde hoy", k.lateToday, `de ${k.shiftsToday} turnos hoy`, { alert: k.lateToday > 0 })}
@@ -477,14 +536,14 @@ views.fichajes = {
   render(d) {
     const k = d.kpis;
     const noSched = k.unscheduled
-      ? `<div class="note section">${ic("info")}<span>${k.unscheduled} persona(s) sin turno detectado: su apodo no incluye Shift 1, 2 o 3 y no tienen horario personal, así que no se mide su puntualidad.</span>${state.user?.role === "admin" ? '<a href="#horarios">Ver turnos</a>' : ""}</div>`
+      ? `<div class="note section">${ic("info")}<span>${k.unscheduled} persona(s) sin medir (cargos exentos o sin turno posible): no se mide su puntualidad.</span>${state.user?.role === "admin" ? '<a href="#horarios">Ver turnos</a>' : ""}</div>`
       : "";
 
     const lateTbl = d.late.length
       ? table("late", "Llegadas tarde", [{ h: "Persona", sort: "text" }, { h: "Turno", sort: "text" }, { h: "Día", sort: "num" }, { h: "Esperado" }, { h: "Llegó" }, { h: "Retraso", num: true, sort: "num" }],
           d.late.map((s) => [
             `<span class="who">${esc(s.name)}</span>`,
-            { h: s.templateName ? esc(s.templateName) : `<span class="dim">${s.scheduleStart ? "Personal" : "—"}</span>`, v: s.templateName || "" },
+            { h: s.templateName ? esc(s.templateName) + (s.planSource === "hora" ? ' <span class="dim">· por hora</span>' : "") : `<span class="dim">${s.scheduleStart ? "Personal" : "—"}</span>`, v: s.templateName || "" },
             { h: `<span class="dim">${fmtDay(s.startedAt)}</span>`, v: s.startedAt },
             `<span class="mono">${fmtTime(s.expectedAt)}</span>`,
             `<span class="mono">${fmtTime(s.startedAt)}</span>`,
@@ -525,6 +584,7 @@ views.fichajes = {
             const marks = [];
             if (s.late) marks.push(pill("bad", "clock", `Tarde +${fmtDur(s.lateMs)}`));
             if (s.breakOverMs) marks.push(pill("bad", "coffee", `Break +${fmtDur(s.breakOverMs)}`));
+            if (s.planSource === "exento") marks.push(pill("", null, "Sin medir"));
             if (!s.endedAt) marks.push(pill("warn", "clock", "Abierto"));
             return [
               `<span class="who">${esc(s.name)}</span>`,
@@ -656,7 +716,7 @@ views.elevenlabs = {
         ${kpi("mic", "Voces activas", d.voices.filter((v) => v.active).length, `${d.voices.filter((v) => v.generations).length} usadas en el periodo`)}
       </div>
       <div class="grid">${planCard}${projCard}${cacheCard}</div>
-      <section class="panel section" aria-labelledby="h-daily"><div class="head"><h2 id="h-daily">Consumo diario</h2></div><p class="sub">Caracteres por día, en hora local</p>
+      <section class="panel section" aria-labelledby="h-daily"><div class="head"><h2 id="h-daily">Consumo diario</h2></div><p class="sub">Caracteres por día, en hora de la agencia</p>
         <div class="chart"><canvas id="c-daily"></canvas></div></section>
       <div class="grid">
         <section class="panel col-6" aria-labelledby="h-cum"><div class="head"><h2 id="h-cum">Acumulado del mes</h2></div><p class="sub">Créditos gastados desde el día 1, con proyección</p>
@@ -830,7 +890,16 @@ views.horarios = {
       ];
     });
     const tplTbl = d.templates.length
-      ? table("tpl", "Turnos fijos", [{ h: "Turno" }, { h: "Entrada (24 h)" }, { h: "Gracia (min)" }, { h: "" }], tplRows)
+      ? (() => {
+        const otra = viewZone() !== state.tz;
+        const cols = [{ h: "Turno" }, { h: "Entrada (24 h)" }];
+        if (otra) cols.push({ h: `En ${esc(viewZone().split("/").pop().replace(/_/g, " "))}` });
+        cols.push({ h: "Gracia (min)" }, { h: "" });
+        const rows = tplRows.map((r, i) =>
+          otra ? [r[0], r[1], `<span class="mono">${entryInViewZone(d.templates[i].startTime)}</span>`, r[2], r[3]] : r
+        );
+        return table("tpl", "Turnos fijos", cols, rows);
+      })()
       : empty("No hay turnos. Crea el primero con el formulario de abajo.");
 
     const rows = d.people.map((p) => {
@@ -856,7 +925,7 @@ views.horarios = {
     const html = `
       ${head("Horarios", `Hora de entrada esperada · ${esc(d.tzLabel)} (<b class="mono">${esc(d.tz)}</b>)`)}
 
-      <div class="note section">${ic("info")}<span>Cada persona se asigna sola al pulsar <b>Start</b>, según su <b>apodo en el servidor de Discord</b>: debe contener el nombre del turno. Por ejemplo, <b>Alejandro - Shift 2 (Chatter)</b> pertenece al turno <b>Shift 2</b>. Valen variantes como shift2 o SHIFT-2. No hay que configurar a nadie uno por uno.</span></div>
+      <div class="note section">${ic("info")}<span>Nadie se configura uno por uno. Al pulsar <b>Start</b> el bot decide el turno, por este orden: <b>1)</b> su horario personal, si lo tiene; <b>2)</b> el turno escrito en su apodo del servidor (por ejemplo <b>Alejandro - Shift 2</b>); <b>3)</b> si su cargo es Team Leader, Jefe de Chat o Content Manager, no se mide; <b>4)</b> si nada de lo anterior, <b>por la hora a la que ficha</b>: el turno cuyo inicio queda más cerca. Con la hora sola, un retraso de más de 4 horas se confunde con llegar antes al turno siguiente: para esos casos conviene el turno en el apodo.</span></div>
 
       <section class="panel section" aria-labelledby="h-tpl"><div class="head"><h2 id="h-tpl">Turnos</h2></div>
         <p class="sub">Hora de entrada de cada turno. Se mide la puntualidad frente a esta hora, más los minutos de gracia. Cambiar un turno no modifica los fichajes ya hechos.</p>
@@ -923,13 +992,26 @@ function setError(input, msg) {
 
 const focusKey = (el) => (el && (el.id || (el.dataset && el.dataset.key))) || null;
 
+function updateTzLabel() {
+  const vz = viewZone();
+  const agency = state.tz;
+  const here = `${vz.split("/").pop().replace(/_/g, " ")} · ${zoneOffset(vz)}`;
+  $("#tz").textContent = vz === agency ? `${here} (agencia)` : `${here}`;
+}
+
 function renderStatusbar() {
   const bar = $("#statusbar");
+  const choice = viewChoice();
+  const agencyLabel = `Hora de la agencia (${state.tz.split("/").pop().replace(/_/g, " ")})`;
+  const options = [["agency", agencyLabel], ...VIEW_ZONES]
+    .map(([v, l]) => `<option value="${esc(v)}" ${v === choice ? "selected" : ""}>${esc(l)}</option>`)
+    .join("");
+  const picker = `<label class="tzsel"><span>Ver las horas en</span><select id="viewtz" aria-label="Zona horaria en la que se muestran las horas del panel">${options}</select></label>`;
   if (state.route === "horarios") {
-    bar.innerHTML = "";
+    bar.innerHTML = picker;
     return;
   }
-  bar.innerHTML = `<span class="live on" id="live"><span class="dot" aria-hidden="true"></span><span id="live-text">Cargando…</span></span>
+  bar.innerHTML = `${picker}<span class="live on" id="live"><span class="dot" aria-hidden="true"></span><span id="live-text">Cargando…</span></span>
     <button type="button" class="btn ghost sm" id="btn-pause" aria-pressed="${state.paused}" data-key="btn-pause">${ic(state.paused ? "play" : "pause")}<span>${state.paused ? "Reanudar" : "Pausar"}</span></button>
     <button type="button" class="btn ghost sm" id="btn-refresh" data-key="btn-refresh">${ic("refresh")}Actualizar</button>`;
   updateLive();
@@ -978,7 +1060,7 @@ async function load({ silent = false, routeChange = false } = {}) {
     if (mine !== state.token || route !== state.route) return;
     if (data.tz) {
       state.tz = data.tz;
-      $("#tz").textContent = data.tz;
+      updateTzLabel();
     }
     state.charts.forEach((c) => c.destroy());
     state.charts = [];
@@ -1110,6 +1192,18 @@ document.querySelectorAll(".js-logout").forEach((b) =>
     showLogin();
   })
 );
+
+$("#statusbar").addEventListener("change", (e) => {
+  if (e.target.id !== "viewtz") return;
+  try {
+    localStorage.setItem(VIEW_KEY, e.target.value);
+  } catch {
+    /* sin almacenamiento: vale solo para esta visita */
+  }
+  updateTzLabel();
+  $("#clock").textContent = new Date().toLocaleTimeString("es", { timeZone: viewZone(), hour: "2-digit", minute: "2-digit", hour12: false });
+  load({ silent: true });
+});
 
 $("#statusbar").addEventListener("click", (e) => {
   if (e.target.closest("#btn-pause")) {
@@ -1433,7 +1527,7 @@ $("#view").addEventListener("submit", async (e) => {
 
 /* Reloj lateral y contadores en vivo (cada segundo, sin tocar el árbol de accesibilidad). */
 setInterval(() => {
-  $("#clock").textContent = new Date().toLocaleTimeString("es", { timeZone: state.tz, hour: "2-digit", minute: "2-digit", hour12: false });
+  $("#clock").textContent = new Date().toLocaleTimeString("es", { timeZone: viewZone(), hour: "2-digit", minute: "2-digit", hour12: false });
   const elapsed = Date.now() - state.loadedAt;
   document.querySelectorAll(".tick").forEach((el) => {
     const v = Number(el.dataset.base) + (el.dataset.run === "1" ? elapsed : 0);

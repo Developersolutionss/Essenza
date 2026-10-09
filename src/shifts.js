@@ -48,10 +48,10 @@ function startShift(discordId, name, now = Date.now(), plan = null) {
   try {
     const info = db
       .prepare(
-        `INSERT INTO shifts (discord_id, discord_name, started_at, template_name, expected_at, grace_minutes)
-         VALUES (?, ?, ?, ?, ?, ?)`
+        `INSERT INTO shifts (discord_id, discord_name, started_at, template_name, expected_at, grace_minutes, plan_source)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
       )
-      .run(discordId, name, now, plan?.templateName ?? null, plan?.expectedAt ?? null, plan?.graceMin ?? null);
+      .run(discordId, name, now, plan?.templateName ?? null, plan?.expectedAt ?? null, plan?.graceMin ?? null, plan?.source ?? null);
     return { ok: true, shift: db.prepare("SELECT * FROM shifts WHERE id = ?").get(info.lastInsertRowid) };
   } catch {
     return { ok: false, reason: "already_open" };

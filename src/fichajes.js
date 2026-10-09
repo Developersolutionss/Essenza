@@ -100,18 +100,25 @@ function runAction(action, discordId, name, names = []) {
         `Podrás pulsar **End** cuando acumules ${fmt(shifts.SHIFT_MS)} de trabajo (sin contar breaks), ` +
         `aprox. ${ts(r.shift.started_at + shifts.SHIFT_MS)}.`;
 
-      if (plan) {
-        const quien = plan.templateName ? `**${plan.templateName}**` : "tu horario personal";
+      if (plan?.source === "exento") {
+        msg += "\nℹ️ Tu cargo no sigue un turno fijo, así que no se mide tu puntualidad.";
+      } else if (plan) {
+        const quien =
+          plan.source === "personal" ? "tu horario personal" : `**${plan.templateName}**`;
         const lateMs = Math.max(0, r.shift.started_at - plan.expectedAt);
-        msg += `\n📋 Turno: ${quien}, entrada a las ${plan.startTime} (${plans.tzLabel()}). `;
+        // La hora de entrada se muestra con el formato de Discord: cada persona la ve
+        // en su propio reloj (en Colombia las 12:00, en Argentina las 14:00...).
+        msg += `\n📋 Turno: ${quien}${plan.source === "hora" ? " (deducido por tu hora de entrada)" : ""}.`;
+        msg += ` Entrada: ${ts(plan.expectedAt)} en tu hora (${plan.startTime}, ${plans.tzLabel()}). `;
         msg += lateMs > plan.graceMin * 60000
           ? `⚠️ Llegaste **${fmt(lateMs)}** tarde.`
           : "Llegaste a tiempo.";
       } else {
-        msg += "\nℹ️ No detecté tu turno. Pon **Shift 1**, **Shift 2** o **Shift 3** en tu apodo del servidor (por ejemplo \"Ana - Shift 2\"). Hoy no se mide tu puntualidad.";
+        msg += "\nℹ️ No pude deducir tu turno, así que hoy no se mide tu puntualidad.";
       }
       return msg;
     }
+
     case "break": {
       const r = shifts.startBreak(discordId);
       if (!r.ok) {

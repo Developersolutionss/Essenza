@@ -92,20 +92,33 @@ de 8 horas:
 | Shift 2 | 13:00 | 21:00 |
 | Shift 3 | 21:00 | 05:00 |
 
-Nadie se configura uno por uno. Al pulsar **Start**, el bot lee el **apodo** de la
-persona en el servidor de Discord: si **contiene** el nombre de un turno (por ejemplo
-`Alejandro - Shift 2 (Chatter)` contiene `Shift 2`), se le aplica la hora de entrada de
-ese turno y el bot le dice si llegó a tiempo o tarde. Valen variantes como `shift2` o
-`SHIFT-2`. Si el apodo no lo trae, se prueba con el nombre global y con los roles.
-Para cambiar a alguien de turno basta con cambiarle el apodo.
+Nadie se configura uno por uno. Al pulsar **Start**, el bot decide el turno por este orden:
+
+1. **Horario personal** (Horarios, Excepciones), si la persona lo tiene.
+2. **Turno escrito en el apodo del servidor**, por ejemplo `Alejandro - Shift 2 (Chatter)`.
+   Valen variantes como `shift2` o `SHIFT-2`; si el apodo no lo trae, se prueba con el
+   nombre global y con los roles. Detecta retrasos de cualquier tamaño.
+3. **Cargo exento**: Team Leader, Jefe de Chat y Content Manager (`EXEMPT_ROLES`) no siguen
+   un turno fijo y no se miden.
+4. **Por la hora de Start**: se toma el turno cuyo inicio queda más cerca. No hace falta tocar
+   ningún nombre. Límite: con turnos separados 8 h, un retraso de más de 4 h se lee como
+   haber llegado antes al turno siguiente; para esos casos conviene el turno en el apodo.
+
+El bot responde a quien ficha con su turno, de cuál de los métodos salió y si llegó a tiempo
+o tarde.
+
+**Cada uno ficha en su zona.** La puntualidad se mide siempre contra la hora de Venezuela, sin
+importar desde dónde se ficha ni la zona del computador. Para que nadie se confunda, el bot
+muestra la hora de entrada con el formato de Discord, que cada persona ve en su propio reloj
+(en Colombia las 12:00, en Argentina y Paraguay las 14:00 para el Shift 2). El panel tiene un
+selector "Ver las horas en" con la zona de la agencia, la del navegador, Colombia, Argentina
+y Paraguay; la elección se recuerda. Las gráficas agrupan por día de la agencia.
 
 - La hora esperada se guarda en el propio fichaje: cambiar un turno o el apodo de alguien
   no reescribe el historial.
 - Los **minutos de gracia** (10 por defecto) se ajustan por turno.
-- Quien no tenga un turno en su apodo no se mide en puntualidad, pero su turno, su break y sus
-  horas se registran igual. El panel avisa de cuántas personas están en ese caso.
-- Un **horario personal** (Horarios, Excepciones) tiene prioridad sobre el turno del apodo.
-  Sirve para quien no sigue su turno.
+- Quien no se mide (cargos exentos) mantiene su turno, su break y sus horas; el panel lo
+  marca como "Sin medir".
 - El turno nocturno cruza la medianoche: quien ficha a las 00:30 en Shift 3 llegó
   3 h 30 min tarde.
 - Los turnos se crean, editan y borran desde Horarios (solo administradores).

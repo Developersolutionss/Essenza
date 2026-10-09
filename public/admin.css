@@ -148,3 +148,8 @@ td.wrap, th.wrap { white-space: normal; min-width: 180px; }
 .side-foot .theme-toggle { justify-content: flex-start; }
 
 .mobile-actions { display: flex; align-items: center; gap: var(--sp-2); }
+
+/* Selector de la zona en la que se leen las horas */
+.tzsel { display: inline-flex; align-items: center; gap: var(--sp-2); margin-right: auto; font-size: var(--fs-xs); color: var(--fg-muted); }
+.tzsel select { min-height: 32px; padding: 2px 28px 2px 8px; font-size: var(--fs-xs); max-width: 100%; }
+@media (pointer: coarse) { .tzsel select { min-height: 44px; } }

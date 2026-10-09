@@ -142,6 +142,7 @@ const shiftCols = db.prepare("PRAGMA table_info(shifts)").all().map((c) => c.nam
 if (!shiftCols.includes("template_name")) db.exec("ALTER TABLE shifts ADD COLUMN template_name TEXT;");
 if (!shiftCols.includes("expected_at")) db.exec("ALTER TABLE shifts ADD COLUMN expected_at INTEGER;");
 if (!shiftCols.includes("grace_minutes")) db.exec("ALTER TABLE shifts ADD COLUMN grace_minutes INTEGER;");
+if (!shiftCols.includes("plan_source")) db.exec("ALTER TABLE shifts ADD COLUMN plan_source TEXT;"); // personal | apodo | hora | exento
 
 // Turnos de la agencia, en hora de Venezuela: 8 horas cada uno.
 if (db.prepare("SELECT COUNT(*) AS n FROM shift_templates").get().n === 0) {

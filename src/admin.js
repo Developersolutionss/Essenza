@@ -184,6 +184,7 @@ function enrichShifts(list) {
       breaks: o.breaks,
       scheduled,
       templateName,
+      planSource: o.shift.plan_source || (scheduleStart ? "personal" : null),
       scheduleStart,
       graceMin,
       expectedAt,
