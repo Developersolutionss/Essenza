@@ -1,5 +1,6 @@
 const db = require("./db");
 const tzu = require("./timezone");
+const shifts = require("./shifts");
 
 // Cómo se sabe a qué turno pertenece alguien cuando pulsa Start.
 //
@@ -17,7 +18,8 @@ const tzu = require("./timezone");
 //
 // Horas extra: si la persona tiene un turno (rol o apodo) y pulsa Start DESPUÉS de que
 // ese turno terminó, todo el fichaje cuenta como horas extra. No se mide puntualidad,
-// no exige una duración mínima y se suma aparte en el panel.
+// no exige una duración mínima y se suma aparte en el panel. También son horas extra
+// si ya cumplió ese mismo turno y vuelve a pulsar Start (ver afterCompletedShift).
 //
 // La hora esperada se guarda en el propio fichaje: si luego se cambia el turno de
 // la persona o la hora del turno, el historial no se reescribe.
@@ -104,6 +106,33 @@ function nearest(options, startedAt) {
   return [...options].sort((a, b) => dist(a) - dist(b))[0];
 }
 
+// Si la persona ya cumplió este mismo turno (mismo día y hora de entrada) y vuelve a
+// pulsar Start, eso son horas extra: no se le exige otro turno completo ni se le marca
+// como tarde. Solo cuenta si de verdad lo cumplió; un turno cerrado antes de tiempo
+// desde el panel no la libera.
+function afterCompletedShift(discordId, plan) {
+  if (!plan || plan.isExtra || plan.expectedAt == null) return plan;
+  const prev = db
+    .prepare(
+      `SELECT * FROM shifts WHERE discord_id = ? AND expected_at = ? AND ended_at IS NOT NULL AND is_extra = 0
+       ORDER BY ended_at DESC LIMIT 1`
+    )
+    .get(discordId, plan.expectedAt);
+  if (!prev) return plan;
+  const breaks = db.prepare("SELECT * FROM shift_breaks WHERE shift_id = ?").all(prev.id);
+  const st = shifts.summarize(prev, breaks, prev.ended_at);
+  if (st.workedMs < st.requiredMs) return plan;
+  return {
+    ...plan,
+    expectedAt: null,
+    graceMin: null,
+    durationMin: 0,
+    isExtra: true,
+    shiftEndedAt: prev.ended_at,
+    alreadyDone: true,
+  };
+}
+
 // Devuelve el plan de esta persona para un fichaje que empieza en `startedAt`:
 //   { source: "personal" | "rol" | "apodo" | "hora" | "exento", templateName, startTime,
 //     graceMin, durationMin, expectedAt, isExtra }
@@ -112,7 +141,11 @@ function nearest(options, startedAt) {
 // medir (menos de dos turnos definidos y sin rol ni apodo).
 //   roleNames: nombres de los roles de Discord de la persona
 //   names: apodo del servidor y nombre global
-function resolveForStart({ discordId, names = [], roleNames = [], startedAt }) {
+function resolveForStart(args) {
+  return afterCompletedShift(args.discordId, resolvePlan(args));
+}
+
+function resolvePlan({ discordId, names = [], roleNames = [], startedAt }) {
   const personal = db.prepare("SELECT * FROM schedules WHERE discord_id = ?").get(discordId);
   if (personal) {
     return {

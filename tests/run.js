@@ -40,5 +40,16 @@ for (const f of files) {
   }
 }
 
+// Las pruebas crean bases temporales en la carpeta temporal del sistema; si alguna se
+// corta a medias no llega a borrarlas. Se limpian aquí las creadas durante esta ejecución.
+const os = require("os");
+for (const d of fs.readdirSync(os.tmpdir())) {
+  if (!/^(essenza|essensa)-/.test(d)) continue;
+  const full = path.join(os.tmpdir(), d);
+  try {
+    if (fs.statSync(full).mtimeMs >= started - 1000) fs.rmSync(full, { recursive: true, force: true });
+  } catch { /* en Windows puede seguir abierto un instante */ }
+}
+
 console.log(`\n${files.length - failed}/${files.length} archivos de pruebas pasan (${((Date.now() - started) / 1000).toFixed(1)} s)`);
 process.exit(failed ? 1 : 0);

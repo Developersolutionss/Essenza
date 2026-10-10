@@ -125,9 +125,13 @@ function runAction(action, discordId, name, names = [], roleNames = [], now = Da
 
       // Fuera de su turno: todo el tiempo cuenta como horas extra y se puede terminar cuando se quiera.
       if (plan?.isExtra) {
+        const turno = plan.templateName ? `**${plan.templateName}**` : "turno";
+        const why = plan.alreadyDone
+          ? `Ya cumpliste tu ${turno} (terminaste a las ${ts(plan.shiftEndedAt)})`
+          : `Tu ${turno} terminó a las ${ts(plan.shiftEndedAt)}`;
         return (
           `✅ Turno iniciado a las ${ts(r.shift.started_at)}.\n` +
-          `⏱️ Tu **${plan.templateName}** terminó a las ${ts(plan.shiftEndedAt)}, así que este tiempo cuenta como ` +
+          `⏱️ ${why}, así que este tiempo cuenta como ` +
           `**horas extra**. No se mide puntualidad y puedes pulsar **End** cuando termines.`
         );
       }

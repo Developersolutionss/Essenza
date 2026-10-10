@@ -131,7 +131,7 @@ function reserveQuota(chatter, modelId, charCount) {
   if (usedToday + charCount > limit) {
     throw new GenerationError(
       429,
-      `Límite diario de caracteres alcanzado (${usedToday}/${limit}). Hablá con tu manager si necesitás más.`
+      `Límite diario de caracteres alcanzado (${usedToday}/${limit}). Habla con tu manager si necesitas más.`
     );
   }
   return logUsage(chatter.id, modelId, charCount, 0);

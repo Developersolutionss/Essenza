@@ -86,6 +86,14 @@ function runTest(file) {
       for (const ext of ["", "-wal", "-shm"]) {
         try { fs.rmSync(dbPath + ext); } catch { /* en Windows puede seguir abierto un instante */ }
       }
+      // Cada prueba crea un perfil de Chrome temporal (decenas de MB): se borra al terminar.
+      for (const d of fs.readdirSync(os.tmpdir())) {
+        if (!d.startsWith("essenza-browser-")) continue;
+        const full = path.join(os.tmpdir(), d);
+        try {
+          if (fs.statSync(full).mtimeMs >= started - 1000) fs.rmSync(full, { recursive: true, force: true, maxRetries: 3 });
+        } catch { /* Chrome puede tardar en soltar algún archivo */ }
+      }
     }
     const summary = (result.out.match(/\d+\/\d+ [^\n]*pasan/g) || []).pop() || "sin resumen";
     const ok = result.code === 0;

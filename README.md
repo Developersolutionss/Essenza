@@ -35,6 +35,10 @@ temporal, un proveedor de voz falso y no conecta con Discord ni con ElevenLabs.
 - `tests/server/` cubre la generación (caché, cuota y pedidos simultáneos), el acceso
   (sesiones, roles, cookies falsificadas), los fichajes, la asignación de turnos, las
   duraciones y los permisos de Discord.
+- `tests/server/bot-profundo.test.js` recorre el bot entero por la misma entrada que usa
+  Discord, con un reloj simulado: unos 4600 Start a todas las horas de dos días, horas extra
+  caso a caso, cinco días con 40 personas comparados con un modelo de referencia (respuestas,
+  base de datos y panel), y todos los comandos.
 - `tests/browser/` abre el panel en Chrome, Edge o Chromium (o el que indique `CHROME_PATH`)
   y comprueba orden de tablas, formularios, roles, modo oscuro, zonas horarias y el
   contraste de todos los textos en ambos modos.
@@ -152,6 +156,10 @@ ficha horas extra: todo ese fichaje cuenta como horas extra.
 - No se mide puntualidad y no hay duración mínima: se puede pulsar End cuando se termine.
 - Vale para un segundo fichaje del mismo día (el Shift 1 que ya cerró su turno a las 13:00 y
   vuelve a las 14:00) y para quien ficha en horas que no son suyas.
+- También es hora extra volver a fichar **después de haber cumplido el turno**, aunque la
+  ventana del turno no haya acabado: quien entró a las 04:00, cumplió sus 7 h 30 min y vuelve a
+  las 12:00 no empieza otro Shift 1 tarde. Esto vale también con horario personal. Un turno que
+  un manager cerró antes de tiempo desde el panel no cuenta como cumplido.
 - Fichar *dentro* de la ventana de su turno, aunque sea con mucho retraso, no es hora extra:
   es una llegada tarde y exige la duración del turno. Solo es extra cuando el turno ya había
   terminado.

@@ -160,7 +160,9 @@ function enrichShifts(list) {
       expectedAt = o.shift.expected_at;
       graceMin = o.shift.grace_minutes ?? defaultGrace;
       templateName = o.shift.template_name;
-    } else if (sc) {
+    } else if (sc && !o.shift.is_extra && !o.shift.plan_source) {
+      // Solo fichajes antiguos, de antes de guardar el turno en el fichaje. Las horas
+      // extra y los cargos exentos no tienen hora de entrada a propósito.
       expectedAt = tzu.expectedStart(o.shift.started_at, sc.start_time, tz);
       graceMin = sc.grace_minutes;
       scheduleStart = sc.start_time;

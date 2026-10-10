@@ -92,7 +92,7 @@ async function replyWithAudio(interaction, chatter, modelId, text) {
     const known = err instanceof GenerationError;
     if (!known) console.error(err);
     await interaction.editReply({
-      content: `❌ ${known ? err.message : "Error inesperado, avisá a un manager."}`,
+      content: `❌ ${known ? err.message : "Error inesperado, avisa a un manager."}`,
     });
   }
 }
@@ -175,7 +175,7 @@ async function handleCommand(interaction) {
   const chatter = chatterFor(interaction.user.id);
   if (!chatter) {
     return interaction.reply({
-      content: "❌ Tu usuario de Discord no está vinculado a un chatter. Pedile a un manager que use /vincular.",
+      content: "❌ Tu usuario de Discord no está vinculado a un chatter. Pídele a un manager que use /vincular.",
       flags: MessageFlags.Ephemeral,
     });
   }
@@ -190,6 +190,13 @@ async function handleCommand(interaction) {
   }
 
   const modelId = Number(interaction.options.getString("modelo"));
+  // Si se escribe el nombre en vez de elegirlo de la lista, llega texto y no un id.
+  if (!Number.isInteger(modelId) || modelId <= 0) {
+    return interaction.reply({
+      content: "❌ Elige la modelo de la lista que aparece al escribir su nombre.",
+      flags: MessageFlags.Ephemeral,
+    });
+  }
   if (name === "voz") {
     return replyWithAudio(interaction, chatter, modelId, interaction.options.getString("texto"));
   }
@@ -201,6 +208,22 @@ async function handleCommand(interaction) {
       return interaction.reply({ content: "❌ Frase no encontrada.", flags: MessageFlags.Ephemeral });
     }
     return replyWithAudio(interaction, chatter, modelId, phrase.text);
+  }
+}
+
+// Punto de entrada de todo lo que llega de Discord (separado para poder probarlo).
+async function onInteraction(interaction) {
+  try {
+    if (interaction.isAutocomplete()) {
+      const focused = interaction.options.getFocused(true);
+      return await interaction.respond(autocompleteRows(focused.name, focused.value));
+    }
+    if (interaction.isChatInputCommand()) return await handleCommand(interaction);
+    if (interaction.isButton() && interaction.customId.startsWith("shift:")) {
+      return await handleShiftButton(interaction);
+    }
+  } catch (err) {
+    console.error("Error en interacción de Discord:", err);
   }
 }
 
@@ -223,24 +246,10 @@ async function startDiscordBot() {
   if (guildId) await rest.put(Routes.applicationCommands(clientId), { body: [] });
 
   const client = new Client({ intents: [GatewayIntentBits.Guilds] });
-
-  client.on("interactionCreate", async (interaction) => {
-    try {
-      if (interaction.isAutocomplete()) {
-        const focused = interaction.options.getFocused(true);
-        return await interaction.respond(autocompleteRows(focused.name, focused.value));
-      }
-      if (interaction.isChatInputCommand()) return await handleCommand(interaction);
-      if (interaction.isButton() && interaction.customId.startsWith("shift:")) {
-        return await handleShiftButton(interaction);
-      }
-    } catch (err) {
-      console.error("Error en interacción de Discord:", err);
-    }
-  });
+  client.on("interactionCreate", onInteraction);
 
   client.once("clientReady", () => console.log(`Bot de Discord conectado como ${client.user.tag}`));
   await client.login(token);
 }
 
-module.exports = { startDiscordBot, isManager, normRole };
+module.exports = { startDiscordBot, onInteraction, isManager, normRole, commands };

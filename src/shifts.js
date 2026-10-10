@@ -151,6 +151,7 @@ function listSince(sinceMs, now = Date.now()) {
 module.exports = {
   SHIFT_MS,
   BREAK_MS,
+  summarize,
   statusOf,
   startShift,
   startBreak,
