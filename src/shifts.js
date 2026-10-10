@@ -111,27 +111,41 @@ function endShift(discordId, now = Date.now()) {
   return { ok: true, shift: closed, ...summarize(closed, breaksOf(closed.id), now) };
 }
 
+// Resume una lista de turnos trayendo todos sus breaks en una sola consulta. Pedirlos
+// turno por turno se notaba: el panel del canal se redibuja en cada pulsación y,
+// con mucha gente en turno, eran cientos de consultas por cada botón.
+function summarizeAll(shifts, breaksSql, args, now) {
+  if (!shifts.length) return [];
+  const byShift = new Map();
+  for (const b of db.prepare(breaksSql).all(...args)) {
+    if (!byShift.has(b.shift_id)) byShift.set(b.shift_id, []);
+    byShift.get(b.shift_id).push(b);
+  }
+  return shifts.map((shift) => ({ shift, ...summarize(shift, byShift.get(shift.id) || [], now) }));
+}
+
 // Turnos abiertos ahora mismo, con su estado.
 function listOpen(now = Date.now()) {
-  return db
-    .prepare("SELECT * FROM shifts WHERE ended_at IS NULL ORDER BY started_at")
-    .all()
-    .map((shift) => ({ shift, ...summarize(shift, breaksOf(shift.id), now) }));
+  const shifts = db.prepare("SELECT * FROM shifts WHERE ended_at IS NULL ORDER BY started_at").all();
+  return summarizeAll(
+    shifts,
+    `SELECT b.* FROM shift_breaks b JOIN shifts s ON s.id = b.shift_id
+     WHERE s.ended_at IS NULL ORDER BY b.started_at`,
+    [],
+    now
+  );
 }
 
 // Turnos iniciados desde `sinceMs`, abiertos o cerrados.
 function listSince(sinceMs, now = Date.now()) {
   const shifts = db.prepare("SELECT * FROM shifts WHERE started_at >= ? ORDER BY started_at DESC").all(sinceMs);
-  if (!shifts.length) return [];
-  const all = db
-    .prepare(`SELECT * FROM shift_breaks WHERE shift_id IN (${shifts.map(() => "?").join(",")}) ORDER BY started_at`)
-    .all(...shifts.map((s) => s.id));
-  const byShift = new Map();
-  for (const b of all) {
-    if (!byShift.has(b.shift_id)) byShift.set(b.shift_id, []);
-    byShift.get(b.shift_id).push(b);
-  }
-  return shifts.map((shift) => ({ shift, ...summarize(shift, byShift.get(shift.id) || [], now) }));
+  return summarizeAll(
+    shifts,
+    `SELECT b.* FROM shift_breaks b JOIN shifts s ON s.id = b.shift_id
+     WHERE s.started_at >= ? ORDER BY b.started_at`,
+    [sinceMs],
+    now
+  );
 }
 
 module.exports = {

@@ -121,7 +121,8 @@ const iniciar = (id, rol, when, names = ["Ana - (Chatter)"]) => s.startShift(id,
   db.prepare("DELETE FROM shifts").run();
   const base0 = Date.now();
   iniciar("api1", "Shift 1", base0 - 3 * 3600e3, ["Ana - (Chatter)"]);          // normal (se fuerza abajo)
-  db.prepare("UPDATE shifts SET is_extra = 0 WHERE discord_id = 'api1'").run();
+  // Llega a su hora: si no, la prueba dependería de la hora a la que se ejecute.
+  db.prepare("UPDATE shifts SET is_extra = 0, expected_at = started_at, grace_minutes = 10, required_minutes = 450 WHERE discord_id = 'api1'").run();
   db.prepare("INSERT INTO shifts (discord_id,discord_name,started_at,ended_at,is_extra,required_minutes,plan_source,template_name) VALUES ('api2','Eva',?,?,1,0,'rol','Shift 1')").run(base0 - 5 * 3600e3, base0 - 3 * 3600e3); // extra de 2 h
   db.prepare("INSERT INTO shifts (discord_id,discord_name,started_at,ended_at,is_extra,required_minutes,plan_source,template_name) VALUES ('api3','Eva',?,?,1,0,'rol','Shift 1')").run(base0 - 2 * 3600e3, base0 - 1 * 3600e3); // extra de 1 h
   db.prepare("INSERT INTO shifts (discord_id,discord_name,started_at,ended_at,required_minutes) VALUES ('api4','Normal',?,?,450)").run(base0 - 30 * 3600e3, base0 - 22.5 * 3600e3); // turno de 7 h 30

@@ -26,6 +26,7 @@ npm test                    # lógica del servidor, unas 180 comprobaciones, ~10
 npm test -- turnos          # solo los archivos cuyo nombre contenga "turnos"
 npm run test:browser        # interfaz real en un navegador, ~3 min
 npm run test:all            # las dos
+npm run test:load           # carga: ~100 personas fichando a la vez (o -- 300)
 ```
 
 Las pruebas **no tocan tus datos ni gastan créditos**: cada una usa una base de datos
@@ -37,6 +38,11 @@ temporal, un proveedor de voz falso y no conecta con Discord ni con ElevenLabs.
 - `tests/browser/` abre el panel en Chrome, Edge o Chromium (o el que indique `CHROME_PATH`)
   y comprueba orden de tablas, formularios, roles, modo oscuro, zonas horarias y el
   contraste de todos los textos en ambos modos.
+
+- `tests/load/` simula a mucha gente pulsando los botones de Discord a la vez (entradas,
+  salidas, breaks, dobles clics y fallos de red) mientras 20 paneles web se refrescan, y
+  comprueba que nadie se queda sin respuesta, que no hay turnos duplicados y que el proceso
+  no se bloquea. Con 300 personas el panel sigue respondiendo en menos de medio segundo.
 
 Antes de subir un cambio, ejecuta `npm test`. Si tocas la interfaz, también `npm run test:browser`.
 

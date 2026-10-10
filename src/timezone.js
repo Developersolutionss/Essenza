@@ -5,17 +5,28 @@ function getTz() {
   return process.env.TIMEZONE || Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
+// Crear un Intl.DateTimeFormat es caro y aquí se pide muchas veces: uno por zona.
+const formatters = new Map();
+function formatterFor(tz) {
+  let f = formatters.get(tz);
+  if (!f) {
+    f = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      hour: "numeric",
+      minute: "numeric",
+      second: "numeric",
+    });
+    formatters.set(tz, f);
+  }
+  return f;
+}
+
 function parts(ms, tz = getTz()) {
-  const f = new Intl.DateTimeFormat("en-US", {
-    timeZone: tz,
-    hourCycle: "h23",
-    year: "numeric",
-    month: "numeric",
-    day: "numeric",
-    hour: "numeric",
-    minute: "numeric",
-    second: "numeric",
-  });
+  const f = formatterFor(tz);
   const o = {};
   for (const p of f.formatToParts(new Date(ms))) o[p.type] = Number(p.value);
   return { y: o.year, m: o.month, d: o.day, h: o.hour, mi: o.minute, s: o.second };
