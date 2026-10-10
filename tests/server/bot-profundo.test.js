@@ -250,6 +250,9 @@ async function startApi() {
   app.use(express.json());
   app.use("/api/admin", require(path.join(ROOT, "src/admin")));
   const server = app.listen(0, "127.0.0.1");
+  // La simulación ocupa el proceso varios segundos seguidos: con el tiempo de espera
+  // normal (5 s) el servidor cierra la conexión reutilizada y fetch da ECONNRESET.
+  server.keepAliveTimeout = 10 * 60000;
   await new Promise((r) => server.once("listening", r));
   const base = `http://127.0.0.1:${server.address().port}`;
   // La sesión dura 12 h y el reloj simulado salta días: se entra de nuevo en cada consulta.
